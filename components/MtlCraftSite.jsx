@@ -787,6 +787,81 @@ function CategoriesSection({ onSelect }) {
 
 /* ------------------------------ PRODUCT CARD -------------------------------- */
 
+function StarRow({ value, size = 14 }) {
+  return (
+    <span className="mc-stars" aria-label={`${value} de 5 estrelas`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star key={n} size={size} className={n <= Math.round(value) ? "mc-star-filled" : "mc-star-empty"} />
+      ))}
+    </span>
+  );
+}
+
+// Busca as avaliações reais desse produto (nunca inventadas — só existem se
+// alguém realmente comprou, recebeu o kit e avaliou pelo Discord).
+function ProductReviews({ slug }) {
+  const [data, setData] = useState(undefined); // undefined = carregando
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setData(undefined);
+    setError("");
+    fetch(`/api/products/${slug}/reviews`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (active) setData(res);
+      })
+      .catch(() => {
+        if (active) setError("Não foi possível carregar as avaliações.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  if (error) return <p className="mc-modal-desc">{error}</p>;
+  if (data === undefined) return <p className="mc-modal-desc">Carregando avaliações...</p>;
+  if (!data.count) return <p className="mc-modal-desc">Ainda não há avaliações para este kit.</p>;
+
+  return (
+    <div className="mc-reviews">
+      <div className="mc-reviews-summary">
+        <div className="mc-reviews-summary-item">
+          <span className="mc-reviews-summary-label">Atendimento</span>
+          <StarRow value={data.avgService} />
+          <span className="mc-reviews-summary-value">{data.avgService.toFixed(1)}</span>
+        </div>
+        <div className="mc-reviews-summary-item">
+          <span className="mc-reviews-summary-label">Kit</span>
+          <StarRow value={data.avgKit} />
+          <span className="mc-reviews-summary-value">{data.avgKit.toFixed(1)}</span>
+        </div>
+        <p className="mc-reviews-count">
+          {data.count} avaliaç{data.count === 1 ? "ão" : "ões"}
+        </p>
+      </div>
+
+      <ul className="mc-reviews-list">
+        {data.reviews.map((r) => (
+          <li key={r.id} className="mc-review-item">
+            <div className="mc-review-head">
+              <span className="mc-review-username">@{r.username}</span>
+              <span className="mc-review-badge">🛒 Compra verificada</span>
+            </div>
+            <div className="mc-review-stars-row">
+              <span>Atendimento <StarRow value={r.serviceStars} size={12} /></span>
+              <span>Kit <StarRow value={r.kitStars} size={12} /></span>
+            </div>
+            {r.comment && <p className="mc-review-comment">{r.comment}</p>}
+            <p className="mc-review-date">{new Date(r.createdAt).toLocaleDateString("pt-BR")}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ProductCard({ product, onBuy, featuredStyle = false, index = 0 }) {
   const meta = CATEGORY_META[product.category];
   const Icon = meta?.icon ?? Sword;
@@ -1536,6 +1611,11 @@ function BuyModal({ data, onClose }) {
             <button className="mc-btn mc-btn-primary mc-btn-block" onClick={() => setStep("select")}>
               Comprar agora
             </button>
+
+            <div className="mc-reviews-section">
+              <h4 className="mc-reviews-title">⭐ Avaliações</h4>
+              <ProductReviews slug={product.id} />
+            </div>
           </>
         )}
 
@@ -2437,6 +2517,36 @@ const CSS = `
   background:rgba(59,130,246,0.1); border:1px solid rgba(96,165,250,0.3); border-radius:12px;
   padding:14px; font-size:13px; color:#D6E2F5; margin-top:16px; text-align:center;
 }
+
+/* ---------- Avaliações ---------- */
+.mc-reviews-section{ margin-top:26px; border-top:1px solid var(--border); padding-top:20px; }
+.mc-reviews-title{ font-size:14px; font-weight:800; margin:0 0 14px; }
+.mc-stars{ display:inline-flex; gap:2px; vertical-align:middle; }
+.mc-star-filled{ color:#FBBF24; fill:#FBBF24; }
+.mc-star-empty{ color:rgba(255,255,255,0.18); fill:none; }
+.mc-reviews-summary{
+  display:flex; flex-wrap:wrap; align-items:center; gap:18px;
+  background:var(--panel); border:1px solid var(--border); border-radius:14px;
+  padding:16px; margin-bottom:16px;
+}
+.mc-reviews-summary-item{ display:flex; align-items:center; gap:8px; }
+.mc-reviews-summary-label{ font-size:12px; color:var(--muted); font-weight:700; }
+.mc-reviews-summary-value{ font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--blue-400); }
+.mc-reviews-count{ margin:0; font-size:12px; color:var(--muted); width:100%; }
+.mc-reviews-list{ display:flex; flex-direction:column; gap:12px; max-height:320px; overflow-y:auto; }
+.mc-review-item{
+  background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:14px;
+}
+.mc-review-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.mc-review-username{ font-weight:700; font-size:13px; }
+.mc-review-badge{
+  font-size:10.5px; font-weight:700; color:#4ADE80; background:rgba(74,222,128,0.12);
+  border:1px solid rgba(74,222,128,0.3); padding:3px 8px; border-radius:999px; white-space:nowrap;
+}
+.mc-review-stars-row{ display:flex; gap:16px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); margin-bottom:8px; align-items:center; }
+.mc-review-stars-row span{ display:inline-flex; align-items:center; gap:6px; }
+.mc-review-comment{ font-size:13px; color:#D6E2F5; line-height:1.55; margin:0 0 8px; }
+.mc-review-date{ font-size:11px; color:var(--muted); margin:0; }
 
 /* ---------- Footer ---------- */
 .mc-footer{
