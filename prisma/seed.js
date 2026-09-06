@@ -2,7 +2,7 @@
 // usados em components/MtlCraftSite.jsx). Isso é o que permite ao backend
 // validar preço/produto sem inventar outro catálogo — ver seção 9 e 11 do
 // pedido original.
-const { prisma } = require("../index.js");
+const { prisma } = require("../lib/prisma");
 
 const CATEGORIES = [
   { key: "kits", label: "Kits" },
