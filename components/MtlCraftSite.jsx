@@ -42,7 +42,7 @@ import { startRegistration, startAuthentication } from "@simplewebauthn/browser"
 /* ------------------------------ CONFIG --------------------------------- */
 
 // EDITAR AQUI: troque pelo link real do servidor de Discord do MTL CRAFT
-const DISCORD_LINK = "https://discord.gg/SEU-LINK-AQUI";
+const DISCORD_LINK = "https://discord.gg/JJCeSGnS4M";
 
 // EDITAR AQUI: pasta onde ficam as imagens (logo + kits + bases).
 // Crie uma pasta "images" ao lado do site (ou "public/images" no Next.js) e
@@ -54,7 +54,7 @@ const imgUrl = (filename) => (filename ? `${IMG_BASE}/${filename}` : null);
 
 // EDITAR AQUI: chave PIX oficial
 const PIX_KEY = "viola@gmail.com";
-const PIX_HOLDER = "Viola";
+const PIX_HOLDER = "ViolA";
 
 function formatPrice(n) {
   if (n === null || n === undefined) {
