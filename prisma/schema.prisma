@@ -19,6 +19,7 @@ model User {
   updatedAt     DateTime  @updatedAt
   orders        Order[]
   passkeys      Passkey[]
+  reviews       Review[]
 }
 
 /// Uma credencial WebAuthn/Passkey cadastrada pelo usuário em um dispositivo.
@@ -73,6 +74,7 @@ model Product {
   updatedAt   DateTime    @updatedAt
   orderItems  OrderItem[]
   category    Category    @relation(fields: [categoryId], references: [id])
+  reviews     Review[]
 }
 
 model Order {
@@ -93,6 +95,7 @@ model Order {
   items          OrderItem[]
   proofs         PaymentProof[]
   ticket         Ticket?
+  review         Review?
 
   @@index([userId])
 }
@@ -125,6 +128,25 @@ model Ticket {
   createdAt        DateTime  @default(now())
   closedAt         DateTime?
   order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+/// Avaliação de um pedido concluído. Sempre nasce a partir de uma compra real
+/// (orderId é único) — nunca é possível avaliar sem ter comprado. Guarda 2
+/// notas separadas (atendimento no ticket / kit recebido) + comentário livre.
+model Review {
+  id           String   @id @default(cuid())
+  orderId      String   @unique
+  productId    String
+  userId       String
+  serviceStars Int
+  kitStars     Int
+  comment      String?
+  createdAt    DateTime @default(now())
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([productId])
 }
 
 enum WebAuthnChallengeType {
