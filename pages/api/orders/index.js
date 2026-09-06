@@ -1,7 +1,6 @@
 const { prisma } = require("../../../lib/prisma");
 const { getSessionFromReq } = require("../../../lib/session");
 const { generateUniqueOrderCode } = require("../../../lib/orderCode");
-const { notifyBotOfNewOrder } = require("../../../lib/botClient");
 
 export default async function handler(req, res) {
   const session = await getSessionFromReq(req);
@@ -97,13 +96,9 @@ async function createOrder(req, res, session) {
     return res.status(500).json({ error: "Não foi possível criar o pedido." });
   }
 
-  try {
-    await notifyBotOfNewOrder(order);
-  } catch (e) {
-    // O pedido já existe no banco; se o bot estiver fora do ar, o ADM
-    // consegue ver e reenviar depois. Não derruba a resposta ao cliente.
-    console.error("Falha ao avisar o bot sobre o novo pedido:", e);
-  }
+  // Não é preciso avisar o bot por HTTP: o orderWatcher do bot consulta o
+  // Neon a cada 5s por pedidos PENDING_PAYMENT sem ticket e cria o
+  // atendimento sozinho. O pedido já está salvo — é só aguardar o watcher.
 
   return res.status(201).json({
     order: { id: order.id, code: order.code, total: order.total, status: order.status },
