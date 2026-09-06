@@ -294,19 +294,19 @@ const kitsPvp = [
   { id: "pv-subnether",  name: "KIT SUB NETHER", price: 12.00, desc: "Kit avançado para quem domina o submundo.", image: "KitSubNether.png" },
   { id: "pv-cristal",    name: "KIT CRISTAL",    price: 9.00,  desc: "Cristais do End prontos para combate ofensivo.", image: "KitCristal.png" },
   { id: "pv-pvp",        name: "KIT PVP",        price: 11.00, desc: "Kit completo montado para duelos competitivos.", image: "KitPVP.png" },
-  { id: "pv-guerreiro",  name: "KIT GUERREIRO",  price: 18.00, desc: "Armadura e armamento de guerreiro experiente.", image: "KitGuerreiro+Compl1.png" },
+  { id: "pv-guerreiro",  name: "KIT GUERREIRO",  price: 18.00, desc: "Armadura e armamento de guerreiro experiente.", images: ["KitGuerreiro.jpg", "KitGuerreiroComp1.jpg"] },
   { id: "pv-duo",        name: "KIT DUO",        price: 14.00, desc: "Preparado para batalhas em dupla.", image: "KitDuo.png" },
-  { id: "pv-god",        name: "KIT GOD",        price: 25.00, desc: "O topo absoluto dos kits PVP do MTL CRAFT.", featured: true, image: "KitGod+Compl1-e-2.png" },
+  { id: "pv-god",        name: "KIT GOD",        price: 25.00, desc: "O topo absoluto dos kits PVP do MTL CRAFT.", featured: true, images: ["KitGod.jpg", "KitGodComp1.jpg", "KitGodComp2.jpg"] },
   // Kits novos — imagens em /public/images2. Os marcados com "EDITAR AQUI"
   // não bateram com certeza numa foto da sua pasta (a screenshot que você
   // mandou estava cortada); confira o nome do arquivo e ajuste se precisar.
-  { id: "pv-reidosares", name: "KIT REI DOS ARES",      price: 15.00, desc: "Domine os ares com um kit lendário, digno de um rei.", image: "images2/KitAres.jpg" },
+  { id: "pv-reidosares", name: "KIT REI DOS ARES",      price: 15.00, desc: "Domine os ares com um kit lendário, digno de um rei.", images: ["images2/KitAres.jpg", "images2/KitAres2.png"] },
   // EDITAR AQUI: não encontrei um arquivo óbvio pra "RAID BASE" — troque pelo nome certo em /public/images2.
   { id: "pv-raidbase",   name: "KIT RAID BASE",         price: 5.00,  desc: "Kit completo para invadir e destruir bases inimigas.", image: "images2/KitRaidBase.jpg" },
   // EDITAR AQUI: usei "KitEnd.jpg" tanto aqui quanto no KIT END abaixo — confirme se são fotos diferentes.
   { id: "pv-reiend",     name: "KIT REI END",           price: 20.00, desc: "Poder supremo para dominar as terras do End.", image: "images2/KitEnd.jpg" },
-  { id: "pv-reidomar",   name: "KIT REI DO MAR",        price: 20.00, desc: "Equipamento aquático de um verdadeiro rei dos mares.", image: "images2/ReiDoMar.jpg" },
-  { id: "pv-reinether",  name: "KIT REI NETHER",        price: 23.00, desc: "O topo do poder para reinar sobre o Nether.", image: "images2/ReiDoNether.jpg" },
+  { id: "pv-reidomar",   name: "KIT REI DO MAR",        price: 20.00, desc: "Equipamento aquático de um verdadeiro rei dos mares.", images: ["images2/ReiDoMar.jpg", "images2/ReiDoMarComp1.jpg"] },
+  { id: "pv-reinether",  name: "KIT REI NETHER",        price: 23.00, desc: "O topo do poder para reinar sobre o Nether.", images: ["images2/ReiDoNether.jpg", "images2/ReiDoNetherComp1.jpg"] },
   // EDITAR AQUI: não encontrei um arquivo óbvio pra "MINERADOR" — troque pelo nome certo em /public/images2.
   { id: "pv-minerador",  name: "KIT MINERADOR",         price: 5.00,  desc: "Ferramentas turbinadas para minerar com máxima eficiência.", image: "images2/KitMinerador.jpg" },
   { id: "pv-infernal",   name: "KIT INFERNAL",          price: 10.00, desc: "Armamento das profundezas para quem não teme o fogo.", image: "images2/KitInfernal.jpg" },
@@ -467,6 +467,7 @@ function useCountUpVisible() {
 // /images, mostra o ícone no lugar em vez de quebrar o layout.
 function ImageWithFallback({ src, alt, fallback, className, imgStyle }) {
   const [error, setError] = useState(false);
+  useEffect(() => setError(false), [src]);
   if (!src || error) return fallback;
   return (
     <img
@@ -476,6 +477,35 @@ function ImageWithFallback({ src, alt, fallback, className, imgStyle }) {
       style={imgStyle}
       onError={() => setError(true)}
       loading="lazy"
+    />
+  );
+}
+
+// Alguns kits têm "complementos" (mesma compra, mais itens na shulker) e a
+// gente mostra isso ciclando as fotos automaticamente: base -> complemento(s)
+// -> volta pra base, em loop. Produtos comuns só passam 1 imagem em `images`
+// (ou usam o campo `image` de sempre) e não ciclam nada.
+function CyclingProductImage({ images, alt, className, fallback }) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex(0);
+    if (!images || images.length <= 1) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % images.length);
+    }, 2600);
+    return () => clearInterval(id);
+  }, [images]);
+
+  const src = images && images.length > 0 ? imgUrl(images[index]) : null;
+
+  return (
+    <ImageWithFallback
+      key={index}
+      src={src}
+      alt={alt}
+      className={`${className} mc-card-image-cycling`}
+      fallback={fallback}
     />
   );
 }
@@ -771,16 +801,29 @@ function ProductCard({ product, onBuy, featuredStyle = false, index = 0 }) {
         )}
 
         <div className="mc-card-image">
-          <ImageWithFallback
-            src={imgUrl(product.image)}
-            alt={product.name}
-            className="mc-card-image-img"
-            fallback={
-              <div className="mc-card-image-fallback">
-                <Icon size={30} />
-              </div>
-            }
-          />
+          {product.images && product.images.length > 1 ? (
+            <CyclingProductImage
+              images={product.images}
+              alt={product.name}
+              className="mc-card-image-img"
+              fallback={
+                <div className="mc-card-image-fallback">
+                  <Icon size={30} />
+                </div>
+              }
+            />
+          ) : (
+            <ImageWithFallback
+              src={imgUrl(product.image || (product.images && product.images[0]))}
+              alt={product.name}
+              className="mc-card-image-img"
+              fallback={
+                <div className="mc-card-image-fallback">
+                  <Icon size={30} />
+                </div>
+              }
+            />
+          )}
         </div>
 
         <div className="mc-card-top">
@@ -1464,14 +1507,23 @@ function BuyModal({ data, onClose }) {
           <X size={18} />
         </button>
 
-        {!isKit && product?.image && (
+        {!isKit && (product?.image || product?.images?.length > 0) && (
           <div className="mc-modal-image">
-            <ImageWithFallback
-              src={imgUrl(product.image)}
-              alt={product.name}
-              className="mc-modal-image-img"
-              fallback={null}
-            />
+            {product.images && product.images.length > 1 ? (
+              <CyclingProductImage
+                images={product.images}
+                alt={product.name}
+                className="mc-modal-image-img"
+                fallback={null}
+              />
+            ) : (
+              <ImageWithFallback
+                src={imgUrl(product.image || product.images[0])}
+                alt={product.name}
+                className="mc-modal-image-img"
+                fallback={null}
+              />
+            )}
           </div>
         )}
 
@@ -2134,6 +2186,8 @@ const CSS = `
   border:1px solid var(--border); margin:-4px -4px 2px;
 }
 .mc-card-image-img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .4s ease; }
+.mc-card-image-cycling{ animation:mcImgFade 0.6s ease; }
+@keyframes mcImgFade{ from{ opacity:0.15; } to{ opacity:1; } }
 .mc-card:hover .mc-card-image-img{ transform:scale(1.06); }
 .mc-card-image-fallback{
   width:100%; height:100%; display:flex; align-items:center; justify-content:center;
