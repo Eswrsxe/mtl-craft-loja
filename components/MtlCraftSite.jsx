@@ -54,7 +54,7 @@ const imgUrl = (filename) => (filename ? `${IMG_BASE}/${filename}` : null);
 
 // EDITAR AQUI: chave PIX oficial
 const PIX_KEY = "viola@gmail.com";
-const PIX_HOLDER = "ViolA";
+const PIX_HOLDER = "Viola";
 
 function formatPrice(n) {
   if (n === null || n === undefined) {
