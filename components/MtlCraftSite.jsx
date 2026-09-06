@@ -42,7 +42,7 @@ import { startRegistration, startAuthentication } from "@simplewebauthn/browser"
 /* ------------------------------ CONFIG --------------------------------- */
 
 // EDITAR AQUI: troque pelo link real do servidor de Discord do MTL CRAFT
-const DISCORD_LINK = "https://discord.gg/JJCeSGnS4M";
+const DISCORD_LINK = "https://discord.gg/SEU-LINK-AQUI";
 
 // EDITAR AQUI: pasta onde ficam as imagens (logo + kits + bases).
 // Crie uma pasta "images" ao lado do site (ou "public/images" no Next.js) e
@@ -50,7 +50,16 @@ const DISCORD_LINK = "https://discord.gg/JJCeSGnS4M";
 // com esses nomes — não precisa renomear nada.
 // Ex.: /images/iconServer.png, /images/KitClava.png, /images/KitGod+Compl1-e-2.png ...
 const IMG_BASE = "/images";
-const imgUrl = (filename) => (filename ? `${IMG_BASE}/${filename}` : null);
+// Aceita tanto um nome de arquivo simples (ex.: "KitPot.png", que vai para
+// /images/KitPot.png) quanto um caminho já com pasta (ex.: "images2/CLA.jpg",
+// usado pelos kits novos cujas imagens ficam em /public/images2).
+const imgUrl = (filename) => {
+  if (!filename) return null;
+  if (filename.startsWith("/") || filename.includes("/")) {
+    return filename.startsWith("/") ? filename : `/${filename}`;
+  }
+  return `${IMG_BASE}/${filename}`;
+};
 
 // EDITAR AQUI: chave PIX oficial
 const PIX_KEY = "viola@gmail.com";
@@ -288,6 +297,28 @@ const kitsPvp = [
   { id: "pv-guerreiro",  name: "KIT GUERREIRO",  price: 18.00, desc: "Armadura e armamento de guerreiro experiente.", image: "KitGuerreiro+Compl1.png" },
   { id: "pv-duo",        name: "KIT DUO",        price: 14.00, desc: "Preparado para batalhas em dupla.", image: "KitDuo.png" },
   { id: "pv-god",        name: "KIT GOD",        price: 25.00, desc: "O topo absoluto dos kits PVP do MTL CRAFT.", featured: true, image: "KitGod+Compl1-e-2.png" },
+  // Kits novos — imagens em /public/images2. Os marcados com "EDITAR AQUI"
+  // não bateram com certeza numa foto da sua pasta (a screenshot que você
+  // mandou estava cortada); confira o nome do arquivo e ajuste se precisar.
+  { id: "pv-reidosares", name: "KIT REI DOS ARES",      price: 15.00, desc: "Domine os ares com um kit lendário, digno de um rei.", image: "images2/KitAres.jpg" },
+  // EDITAR AQUI: não encontrei um arquivo óbvio pra "RAID BASE" — troque pelo nome certo em /public/images2.
+  { id: "pv-raidbase",   name: "KIT RAID BASE",         price: 5.00,  desc: "Kit completo para invadir e destruir bases inimigas.", image: "images2/KitRaidBase.jpg" },
+  // EDITAR AQUI: usei "KitEnd.jpg" tanto aqui quanto no KIT END abaixo — confirme se são fotos diferentes.
+  { id: "pv-reiend",     name: "KIT REI END",           price: 20.00, desc: "Poder supremo para dominar as terras do End.", image: "images2/KitEnd.jpg" },
+  { id: "pv-reidomar",   name: "KIT REI DO MAR",        price: 20.00, desc: "Equipamento aquático de um verdadeiro rei dos mares.", image: "images2/ReiDoMar.jpg" },
+  { id: "pv-reinether",  name: "KIT REI NETHER",        price: 23.00, desc: "O topo do poder para reinar sobre o Nether.", image: "images2/ReiDoNether.jpg" },
+  // EDITAR AQUI: não encontrei um arquivo óbvio pra "MINERADOR" — troque pelo nome certo em /public/images2.
+  { id: "pv-minerador",  name: "KIT MINERADOR",         price: 5.00,  desc: "Ferramentas turbinadas para minerar com máxima eficiência.", image: "images2/KitMinerador.jpg" },
+  { id: "pv-infernal",   name: "KIT INFERNAL",          price: 10.00, desc: "Armamento das profundezas para quem não teme o fogo.", image: "images2/KitInfernal.jpg" },
+  { id: "pv-end",        name: "KIT END",                price: 8.00,  desc: "Itens essenciais para expedições e combates no End.", image: "images2/KitEnd.jpg" },
+  // EDITAR AQUI: chutei "KitRed.jpg" pra REDSTONE (também note que você escreveu "RESDSTONE" — confirme se não é erro de digitação de "REDSTONE").
+  { id: "pv-redstone",   name: "KIT RESDSTONE",         price: 4.00,  desc: "Componentes de redstone para construções e mecanismos.", image: "images2/KitRed.jpg" },
+  { id: "pv-armo",       name: "KIT ARMO",              price: 35.00, desc: "Armadura reforçada para máxima proteção em combate.", image: "images2/KitArmo.jpg" },
+  { id: "pv-cla",        name: "KIT CLÃ",               price: 30.00, desc: "Kit exclusivo para o seu clã dominar o servidor.", image: "images2/CLA.jpg" },
+  { id: "pv-mestresmagia", name: "KIT MESTRES DA MAGIA", price: 8.00,  desc: "Itens mágicos para os verdadeiros mestres da arcania.", image: "images2/KitMagia.jpg" },
+  { id: "pv-pvpdima",    name: "KIT PVP DIMA",          price: 5.00,  desc: "Kit PVP badalado, pronto pra guerra.", image: "images2/PVPDima.jpg" },
+  // EDITAR AQUI: chutei "KitSemiDeus.jpg" pra "KIT DEUS" — confirme se é essa a foto certa ou se existe uma "KitDeus.jpg" separada.
+  { id: "pv-deus",       name: "KIT DEUS",              price: 12.00, desc: "Poder absoluto — o kit dos deuses do MTL CRAFT.", image: "images2/KitSemiDeus.jpg" },
 ];
 
 const vipPlans = [
