@@ -62,8 +62,8 @@ const imgUrl = (filename) => {
 };
 
 // EDITAR AQUI: chave PIX oficial
-const PIX_KEY = "viola@gmail.com";
-const PIX_HOLDER = "Viola";
+const PIX_KEY = "pixmtlcraft@gmail.com";
+const PIX_HOLDER = "CHARLES DOS SANTOS AREQUE JÚNIOR";
 
 function formatPrice(n) {
   if (n === null || n === undefined) {
