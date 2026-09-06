@@ -44,6 +44,24 @@ async function createOrder(req, res, session) {
     if (existing) return res.status(200).json({ order: existing });
   }
 
+  // Regra: só pode existir 1 atendimento (ticket) em aberto por vez por
+  // comprador. Bloqueia aqui um novo pedido enquanto o anterior ainda está
+  // em andamento — seja porque o ticket ainda não foi criado pelo watcher,
+  // seja porque o ticket já existe e continua aberto no Discord.
+  const blockingOrder = await prisma.order.findFirst({
+    where: {
+      userId: session.userId,
+      status: { in: ["PENDING_PAYMENT", "PAYMENT_REVIEW", "PAID", "DELIVERING"] },
+      OR: [{ ticket: null }, { ticket: { status: "OPEN" } }],
+    },
+    select: { code: true },
+  });
+  if (blockingOrder) {
+    return res.status(409).json({
+      error: `Você já tem um atendimento em aberto (pedido #${blockingOrder.code}). Finalize-o no Discord antes de fazer um novo pedido.`,
+    });
+  }
+
   // NUNCA confiar em preço/subtotal/total vindos do cliente — buscamos o
   // produto real e o preço real no banco (ver seção 11 do pedido original).
   const slugs = [...new Set(items.map((i) => i.productId))];
