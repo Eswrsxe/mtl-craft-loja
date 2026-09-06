@@ -277,7 +277,6 @@ const kitsPadrao = [
   // apontando para "KitImortal.png" (o nome mais parecido). Troque se não for o certo.
   { id: "kp-mortal",  name: "KIT MORTAL",    price: 3.50, desc: "Itens letais para eliminar seus inimigos com eficiência.", image: "KitImortal.png" },
   { id: "kp-farm",    name: "KIT FARM",      price: 6.50, desc: "Ferramentas e insumos para turbinar sua farm.", image: "KitFarm.png" },
-  { id: "kp-semideus", name: "KIT SEMI-DEUS",   price: 12.00, desc: "Pacote de pérolas do End para mobilidade em combate.", image: "public/images2/KitSemiDeus.jpg" },
 ];
 
 const kitsPvp = [
