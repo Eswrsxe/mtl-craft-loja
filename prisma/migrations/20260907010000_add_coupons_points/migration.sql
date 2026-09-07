@@ -1,14 +1,21 @@
--- AlterTable
-ALTER TABLE "User" ADD COLUMN     "points" INTEGER NOT NULL DEFAULT 0;
+-- Corretiva: a migration anterior (20260907010000_coupons_and_points) ficou
+-- marcada como aplicada na tabela de controle do Prisma sem que as colunas
+-- realmente tivessem sido criadas no banco (provavelmente por causa de um
+-- build anterior que falhou depois do "migrate deploy" já ter rodado).
+-- Tudo aqui usa IF NOT EXISTS, então é seguro rodar mesmo que alguma parte
+-- já exista.
 
--- AlterTable
-ALTER TABLE "Order" ADD COLUMN     "couponCode" TEXT,
-ADD COLUMN     "discountAmount" DECIMAL(10,2) NOT NULL DEFAULT 0,
-ADD COLUMN     "pointsUsed" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "pointsEarned" INTEGER NOT NULL DEFAULT 0;
+-- AlterTable User
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "points" INTEGER NOT NULL DEFAULT 0;
 
--- CreateTable
-CREATE TABLE "Coupon" (
+-- AlterTable Order
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "couponCode" TEXT;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "discountAmount" DECIMAL(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "pointsUsed" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "pointsEarned" INTEGER NOT NULL DEFAULT 0;
+
+-- CreateTable Coupon
+CREATE TABLE IF NOT EXISTS "Coupon" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "discountType" TEXT NOT NULL,
@@ -24,4 +31,4 @@ CREATE TABLE "Coupon" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Coupon_code_key" ON "Coupon"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "Coupon_code_key" ON "Coupon"("code");
