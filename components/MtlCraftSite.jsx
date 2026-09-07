@@ -454,13 +454,13 @@ const tagPlans = [
   { id: "tag-mensal",  name: "TAG MENSAL",  price: 3.50, period: "Mensal" },
 ];
 
-const STORE_PRODUCTS = [...kitsPadrao, ...kitsPvp, ...vipPlans, ...customItems, ...tagPlans, ...bases];
-const STORE_PRODUCT_BY_ID = Object.fromEntries(STORE_PRODUCTS.map((p) => [p.id, p]));
-
 const bases = [
   { id: "base-basica", name: "BASE BÁSICA", price: 30.00, stock: 3, desc: "Base inicial pronta para uso, ideal para começar com segurança." },
   { id: "base-op",     name: "BASE OP",     price: 50.00, stock: 1, desc: "Base avançada, totalmente equipada e otimizada.", featured: true },
 ];
+
+const STORE_PRODUCTS = [...kitsPadrao, ...kitsPvp, ...vipPlans, ...customItems, ...tagPlans, ...bases];
+const STORE_PRODUCT_BY_ID = Object.fromEntries(STORE_PRODUCTS.map((p) => [p.id, p]));
 
 const coordPricing = [
   { world: "Overworld", icon: "🌎", rate: "R$ 0,50 a cada 10.000 blocos" },
