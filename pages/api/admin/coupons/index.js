@@ -1,6 +1,6 @@
-const { prisma } = require("../../../lib/prisma");
-const { getSessionFromReq } = require("../../../lib/session");
-const { isAdminSession } = require("../../../lib/adminAuth");
+const { prisma } = require("../../../../lib/prisma");
+const { getSessionFromReq } = require("../../../../lib/session");
+const { isAdminSession } = require("../../../../lib/adminAuth");
 
 const VALID_TYPES = ["PERCENT", "FIXED"];
 
