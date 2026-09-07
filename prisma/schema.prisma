@@ -15,9 +15,9 @@ model User {
   username      String
   discriminator String?
   avatar        String?
+  points        Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  points        Int       @default(0)
   orders        Order[]
   passkeys      Passkey[]
   reviews       Review[]
@@ -84,11 +84,11 @@ model Order {
   idempotencyKey String?        @unique
   userId         String
   subtotal       Decimal        @db.Decimal(10, 2)
-  total          Decimal        @db.Decimal(10, 2)
   couponCode     String?
   discountAmount Decimal        @default(0) @db.Decimal(10, 2)
   pointsUsed     Int            @default(0)
   pointsEarned   Int            @default(0)
+  total          Decimal        @db.Decimal(10, 2)
   status         OrderStatus    @default(PENDING_PAYMENT)
   approvedBy     String?
   approvedAt     DateTime?
@@ -103,25 +103,6 @@ model Order {
   review         Review?
 
   @@index([userId])
-}
-
-model Coupon {
-  id          String       @id @default(cuid())
-  code        String       @unique
-  type        CouponType
-  value       Decimal      @db.Decimal(10, 2)
-  startsAt    DateTime?
-  expiresAt   DateTime?
-  maxUses     Int?
-  usedCount   Int          @default(0)
-  active      Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-}
-
-enum CouponType {
-  PERCENT
-  FIXED
 }
 
 model OrderItem {
@@ -171,6 +152,21 @@ model Review {
   user         User     @relation(fields: [userId], references: [id])
 
   @@index([productId])
+}
+
+/// Cupom de desconto. discountType define se discountValue é "PERCENT" (0-100)
+/// ou "FIXED" (valor em reais). maxUses null = uso ilimitado.
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  discountType  String
+  discountValue Decimal   @db.Decimal(10, 2)
+  maxUses       Int?
+  usedCount     Int       @default(0)
+  validFrom     DateTime?
+  validUntil    DateTime?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
 }
 
 enum WebAuthnChallengeType {
