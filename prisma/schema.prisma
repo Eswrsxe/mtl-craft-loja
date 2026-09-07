@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Conta de usuário. O identificador principal é o discordId — nunca o
+/// username (que pode mudar).
+model User {
+  id            String    @id @default(cuid())
+  discordId     String    @unique
+  username      String
+  discriminator String?
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  points        Int       @default(0)
+  orders        Order[]
+  passkeys      Passkey[]
+  reviews       Review[]
+}
+
+/// Uma credencial WebAuthn/Passkey cadastrada pelo usuário em um dispositivo.
+/// Nunca guarda biometria — só o resultado público do desafio criptográfico.
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  transports   String[]  @default([])
+  deviceLabel  String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Challenge temporário de WebAuthn (registro ou login). Expira rápido e é
+/// apagado após o uso — protege contra replay.
+model WebAuthnChallenge {
+  id        String                @id @default(cuid())
+  userId    String?
+  challenge String
+  type      WebAuthnChallengeType
+  createdAt DateTime              @default(now())
+  expiresAt DateTime
+
+  @@index([challenge])
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  key      String    @unique
+  label    String
+  products Product[]
+}
+
+/// Espelho, no backend, do catálogo que já existe no site. O "slug" é o
+/// mesmo id usado no front (ex.: "kp-perolas", "vip-mensal", "ci-full")
+/// para não precisar reescrever o catálogo — só reaproveitá-lo.
+model Product {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  description String?
+  price       Decimal     @db.Decimal(10, 2)
+  categoryId  String
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+  category    Category    @relation(fields: [categoryId], references: [id])
+  reviews     Review[]
+}
+
+model Order {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  idempotencyKey String?        @unique
+  userId         String
+  subtotal       Decimal        @db.Decimal(10, 2)
+  total          Decimal        @db.Decimal(10, 2)
+  couponCode     String?
+  discountAmount Decimal        @default(0) @db.Decimal(10, 2)
+  pointsUsed     Int            @default(0)
+  pointsEarned   Int            @default(0)
+  status         OrderStatus    @default(PENDING_PAYMENT)
+  approvedBy     String?
+  approvedAt     DateTime?
+  deliveredBy    String?
+  deliveredAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  proofs         PaymentProof[]
+  ticket         Ticket?
+  review         Review?
+
+  @@index([userId])
+}
+
+model Coupon {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  type        CouponType
+  value       Decimal      @db.Decimal(10, 2)
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  maxUses     Int?
+  usedCount   Int          @default(0)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String
+  nameSnapshot String
+  unitPrice    Decimal @db.Decimal(10, 2)
+  quantity     Int
+  lineTotal    Decimal @db.Decimal(10, 2)
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product @relation(fields: [productId], references: [id])
+}
+
+model PaymentProof {
+  id                   String   @id @default(cuid())
+  orderId              String
+  discordAttachmentUrl String
+  submittedAt          DateTime @default(now())
+  order                Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Ticket {
+  id               String    @id @default(cuid())
+  orderId          String    @unique
+  discordChannelId String    @unique
+  status           String    @default("OPEN")
+  createdAt        DateTime  @default(now())
+  closedAt         DateTime?
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+/// Avaliação de um pedido concluído. Sempre nasce a partir de uma compra real
+/// (orderId é único) — nunca é possível avaliar sem ter comprado. Guarda 2
+/// notas separadas (atendimento no ticket / kit recebido) + comentário livre.
+model Review {
+  id           String   @id @default(cuid())
+  orderId      String   @unique
+  productId    String
+  userId       String
+  serviceStars Int
+  kitStars     Int
+  comment      String?
+  createdAt    DateTime @default(now())
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id])
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([productId])
+}
+
+enum WebAuthnChallengeType {
+  REGISTRATION
+  AUTHENTICATION
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_REVIEW
+  PAID
+  DELIVERING
+  COMPLETED
+  CANCELLED
+}
