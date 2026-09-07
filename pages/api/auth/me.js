@@ -13,6 +13,7 @@ export default async function handler(req, res) {
         discordId: true,
         username: true,
         avatar: true,
+        points: true,
         _count: { select: { passkeys: true } },
       },
     });
