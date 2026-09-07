@@ -2976,6 +2976,7 @@ const CSS = `
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
   display:flex; align-items:center; justify-content:center; padding:20px; z-index:100;
   animation:mcFadeIn 0.2s ease;
+  height:100vh; height:100dvh;
 }
 @keyframes mcFadeIn{ from{ opacity:0; } to{ opacity:1; } }
 .mc-modal{
@@ -2983,7 +2984,7 @@ const CSS = `
   background:linear-gradient(160deg, var(--panel-2), var(--base));
   border:1px solid rgba(96,165,250,0.3); border-radius:22px; padding:28px;
   box-shadow:0 20px 60px -10px rgba(0,0,0,0.7), 0 0 40px -10px rgba(59,130,246,0.35);
-  max-height:88vh; overflow-y:auto;
+  max-height:85vh; max-height:85dvh; overflow-y:auto;
   animation:mcModalIn 0.25s cubic-bezier(.16,.84,.44,1);
 }
 @keyframes mcModalIn{ from{ opacity:0; transform:translateY(14px) scale(0.98); } to{ opacity:1; transform:translateY(0) scale(1); } }
@@ -3095,6 +3096,7 @@ const CSS = `
 /* ---------- Conta: pontos + comprar de novo ---------- */
 .mc-account-points{ font-family:var(--font-mono); font-weight:800; color:var(--blue-400); }
 .mc-account-order-item{ display:flex; flex-direction:column; gap:8px; }
+.mc-account-orders-list{ max-height:280px; }
 .mc-account-order-row{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; width:100%; }
 .mc-account-reorder-btn{ align-self:flex-start; }
 
