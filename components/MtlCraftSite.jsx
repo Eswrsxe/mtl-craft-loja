@@ -88,25 +88,11 @@ function formatPrice(n) {
    ============================================================================ */
 
 async function apiFetch(url, options = {}) {
-  // Evita que qualquer API pendurada deixe a interface presa em "carregando"
-  // para sempre (especialmente /api/auth/me em ambientes com banco indisponível).
-  const controller = new AbortController();
-  const timeoutMs = options.timeoutMs ?? 12000;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const { timeoutMs: _timeoutMs, signal: externalSignal, ...fetchOptions } = options;
-  const signal = externalSignal || controller.signal;
-
-  let res;
-  try {
-    res = await fetch(url, {
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
-      ...fetchOptions,
-      signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
+  const res = await fetch(url, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
   let body = null;
   try {
     body = await res.json();
@@ -172,14 +158,10 @@ function AuthProvider({ children }) {
       const data = await apiFetch("/api/auth/me");
 
       if (data.authError) {
-        // Nunca deixe o estado de autenticação preso em "carregando".
-        // O usuário pode tentar novamente e, se já havia uma sessão conhecida,
-        // preservamos essa sessão visualmente.
-        if (userRef.current === undefined) {
-          setUser(null);
-          userRef.current = null;
-        }
-        return userRef.current;
+        // Falha temporária do servidor/banco (ex.: Neon indisponível por um
+        // instante). Isso NÃO significa que o usuário saiu — mantém o que já
+        // sabíamos em vez de derrubar a sessão silenciosamente.
+        return userRef.current === undefined ? null : userRef.current;
       }
 
       const nextUser = data.user || null;
@@ -477,9 +459,6 @@ const bases = [
   { id: "base-op",     name: "BASE OP",     price: 50.00, stock: 1, desc: "Base avançada, totalmente equipada e otimizada.", featured: true },
 ];
 
-const STORE_PRODUCTS = [...kitsPadrao, ...kitsPvp, ...vipPlans, ...customItems, ...tagPlans, ...bases];
-const STORE_PRODUCT_BY_ID = Object.fromEntries(STORE_PRODUCTS.map((p) => [p.id, p]));
-
 const coordPricing = [
   { world: "Overworld", icon: "🌎", rate: "R$ 0,50 a cada 10.000 blocos" },
   { world: "Nether",    icon: "🔥", rate: "R$ 1,00 a cada 20.000 blocos" },
@@ -682,47 +661,46 @@ const NAV_LINKS = [
   { label: "Pagamento", href: "#pagamento" },
 ];
 
-function AccountButton({ size = "sm", compact = false }) {
+function AccountButton({ size = "sm" }) {
   const { user, loading, loginWithDiscord } = useAuthCtx();
   const [accountOpen, setAccountOpen] = useState(false);
 
   if (loading) {
     return (
-      <button className={`mc-btn mc-btn-outline mc-btn-${size} ${compact ? "mc-icon-btn" : ""}`} disabled aria-label="Carregando conta">
-        <Loader2 size={16} className="mc-spin" />
+      <button className={`mc-btn mc-btn-outline mc-btn-${size} ${size !== "block" ? "mc-nav-icon-btn" : ""}`} disabled>
+        <Loader2 size={15} className="mc-spin" />
       </button>
     );
   }
 
   if (!user) {
     return (
-      <button className={`mc-btn mc-btn-outline mc-btn-${size} ${compact ? "mc-icon-btn" : ""}`} onClick={() => loginWithDiscord()} aria-label="Entrar">
-        <UserIcon size={16} /> {!compact && "Entrar"}
+      <button className={`mc-btn mc-btn-outline mc-btn-${size} ${size !== "block" ? "mc-nav-icon-btn" : ""}`} onClick={() => loginWithDiscord()}>
+        <UserIcon size={15} /> {size === "block" && "Entrar"}
       </button>
     );
   }
 
   return (
     <>
-      <button className={`mc-btn mc-btn-outline mc-btn-${size} ${compact ? "mc-icon-btn" : ""}`} onClick={() => setAccountOpen(true)} aria-label="Minha conta" title={compact ? user.username : undefined}>
-        <UserIcon size={16} /> {!compact && user.username}
+      <button className={`mc-btn mc-btn-outline mc-btn-${size} ${size !== "block" ? "mc-nav-icon-btn" : ""}`} onClick={() => setAccountOpen(true)}>
+        <UserIcon size={15} /> {size === "block" && user.username}
       </button>
       {accountOpen && <AccountPanel onClose={() => setAccountOpen(false)} />}
     </>
   );
 }
 
-function CartButton({ size = "sm", compact = false }) {
+function CartButton({ size = "sm" }) {
   const cart = useCartCtx();
   return (
     <button
-      className={`mc-btn mc-btn-outline mc-btn-${size} mc-cart-btn ${compact ? "mc-icon-btn" : ""}`}
+      className={`mc-btn mc-btn-outline mc-btn-${size} mc-cart-btn ${size !== "block" ? "mc-nav-icon-btn" : ""}`}
       onClick={() => cart.setOpen(true)}
       aria-label="Abrir carrinho"
-      title={compact ? "Carrinho" : undefined}
     >
-      <ShoppingCart size={16} />
-      {!compact && size === "block" && "Carrinho"}
+      <ShoppingCart size={15} />
+      {size === "block" && "Carrinho"}
       {cart.count > 0 && <span className="mc-cart-badge">{cart.count}</span>}
     </button>
   );
@@ -747,37 +725,48 @@ function Navbar({ onBuyClick }) {
   return (
     <header className={`mc-nav ${scrolled ? "mc-nav-scrolled" : ""}`}>
       <div className="mc-nav-inner">
-        <button className="mc-nav-burger" aria-label={open ? "Fechar menu" : "Abrir menu"} onClick={() => setOpen((o) => !o)}>
-          {open ? <X size={20} /> : <Menu size={20} />}
+        <button className="mc-nav-logo-btn" onClick={() => go("#inicio")}>
+          <Logo />
         </button>
 
-        <div className="mc-nav-spacer" aria-hidden="true" />
+        <nav className="mc-nav-links">
+          {NAV_LINKS.map((l) => (
+            <button key={l.href} className="mc-nav-link" onClick={() => go(l.href)}>
+              {l.label}
+            </button>
+          ))}
+        </nav>
 
         <div className="mc-nav-actions">
-          <CartButton size="sm" compact />
-          <AccountButton size="sm" compact />
+          <CartButton size="sm" />
+          <AccountButton size="sm" />
+          <button className="mc-btn mc-btn-primary mc-btn-sm mc-nav-buy-btn" onClick={() => go("#catalogo")}>
+            <ShoppingCart size={15} />
+            Comprar agora
+          </button>
+          <button
+            className="mc-nav-burger"
+            aria-label="Abrir menu"
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </div>
 
       <div className={`mc-nav-mobile ${open ? "mc-nav-mobile-open" : ""}`}>
-        <div className="mc-nav-mobile-head">
-          <button className="mc-nav-mobile-logo" onClick={() => go("#inicio")} aria-label="Ir para o início">
-            <Logo />
+        {NAV_LINKS.map((l) => (
+          <button key={l.href} className="mc-nav-mobile-link" onClick={() => go(l.href)}>
+            {l.label}
+            <ChevronRight size={16} />
           </button>
-          <button className="mc-nav-mobile-close" onClick={() => setOpen(false)} aria-label="Fechar menu">
-            <X size={20} />
-          </button>
-        </div>
-        <nav className="mc-nav-mobile-links">
-          {NAV_LINKS.map((l) => (
-            <button key={l.href} className="mc-nav-mobile-link" onClick={() => go(l.href)}>
-              {l.label}
-              <ChevronRight size={16} />
-            </button>
-          ))}
-        </nav>
-        <button className="mc-btn mc-btn-primary mc-btn-block" onClick={() => go("#catalogo")}>
-          <ShoppingCart size={16} /> Comprar agora
+        ))}
+        <button
+          className="mc-btn mc-btn-primary mc-btn-block"
+          onClick={() => go("#catalogo")}
+        >
+          <ShoppingCart size={16} />
+          Comprar agora
         </button>
         <div className="mc-nav-mobile-account">
           <CartButton size="block" />
@@ -900,6 +889,110 @@ function CategoriesSection({ onSelect }) {
 }
 
 /* ------------------------------ PRODUCT CARD -------------------------------- */
+
+// Cupom de desconto + resgate de pontos — usado tanto na compra direta
+// quanto no checkout do carrinho. Avisa o total final pro componente pai via
+// onChange; quem realmente valida de novo e aplica de verdade é o backend
+// na hora de criar o pedido (isso aqui é só preview/UX).
+function CheckoutDiscounts({ subtotal, onChange }) {
+  const auth = useAuthCtx();
+  const userPoints = auth.user?.points || 0;
+  const [couponInput, setCouponInput] = useState("");
+  const [couponApplied, setCouponApplied] = useState(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+
+  const maxDiscountRoom = Math.max(0, subtotal - 1);
+  const couponDiscount = couponApplied?.discountAmount || 0;
+  const roomLeftForPoints = Math.max(0, maxDiscountRoom - couponDiscount);
+  const maxRedeemablePoints = Math.min(userPoints, Math.floor(roomLeftForPoints * 10));
+  const cappedPoints = Math.min(pointsToRedeem, maxRedeemablePoints);
+  const pointsDiscount = Math.round((cappedPoints / 10) * 100) / 100;
+  const discountTotal = Math.round((couponDiscount + pointsDiscount) * 100) / 100;
+  const finalTotal = Math.round((subtotal - discountTotal) * 100) / 100;
+
+  useEffect(() => {
+    onChange({ couponCode: couponApplied?.code || null, pointsToRedeem: cappedPoints, discountTotal, finalTotal });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponApplied, cappedPoints, subtotal]);
+
+  const applyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setCouponBusy(true);
+    setCouponError("");
+    try {
+      const res = await apiFetch("/api/coupons/validate", {
+        method: "POST",
+        body: JSON.stringify({ code: couponInput.trim(), subtotal }),
+      });
+      setCouponApplied(res);
+    } catch (e) {
+      setCouponApplied(null);
+      setCouponError(e.message || "Cupom inválido.");
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setCouponApplied(null);
+    setCouponInput("");
+    setCouponError("");
+  };
+
+  return (
+    <div className="mc-discount-box">
+      {!couponApplied ? (
+        <div className="mc-coupon-row">
+          <input
+            className="mc-coupon-input"
+            placeholder="Código do cupom"
+            value={couponInput}
+            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+          />
+          <button
+            className="mc-btn mc-btn-outline mc-btn-xs"
+            onClick={applyCoupon}
+            disabled={couponBusy || !couponInput.trim()}
+          >
+            {couponBusy ? <Loader2 size={13} className="mc-spin" /> : "Aplicar"}
+          </button>
+        </div>
+      ) : (
+        <div className="mc-coupon-applied">
+          <span>
+            🏷️ Cupom <strong>{couponApplied.code}</strong> aplicado (-{formatPrice(couponApplied.discountAmount)})
+          </span>
+          <button className="mc-coupon-remove" onClick={removeCoupon} aria-label="Remover cupom">
+            <X size={13} />
+          </button>
+        </div>
+      )}
+      {couponError && <p className="mc-coupon-error">{couponError}</p>}
+
+      {userPoints > 0 && (
+        <div className="mc-points-row">
+          <div className="mc-points-label">
+            <span>⭐ Usar pontos ({userPoints} disponíveis)</span>
+            <span className="mc-points-value">-{formatPrice(pointsDiscount)}</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={maxRedeemablePoints}
+            step={10}
+            value={cappedPoints}
+            onChange={(e) => setPointsToRedeem(Number(e.target.value))}
+            disabled={maxRedeemablePoints === 0}
+            className="mc-points-slider"
+          />
+          <div className="mc-points-count">{cappedPoints} pontos (10 pontos = R$1,00 de desconto)</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function StarRow({ value, size = 14 }) {
   return (
@@ -1600,135 +1693,14 @@ function PaymentSection() {
 // Monta o payload que o backend precisa para criar o pedido de verdade.
 // O preço mostrado aqui é só para a interface — quem manda é o backend
 // (ver 11. NÃO CONFIAR NO PREÇO DO FRONTEND / pages/api/orders/index.js).
-function buildOrderPayload(data, qty, checkout = {}) {
+function buildOrderPayload(data, qty) {
   const isKit = data.type === "kit";
   if (isKit) {
     return {
       items: data.items.map((i) => ({ productId: i.id, quantity: i.qty })),
-      couponCode: checkout.couponCode || undefined,
-      pointsToRedeem: checkout.pointsToRedeem || 0,
     };
   }
-  return {
-    items: [{ productId: data.product.id, quantity: qty }],
-    couponCode: checkout.couponCode || undefined,
-    pointsToRedeem: checkout.pointsToRedeem || 0,
-  };
-}
-
-function CheckoutDiscounts({ items, subtotal, onChange }) {
-  const auth = useAuthCtx();
-  const [couponInput, setCouponInput] = useState("");
-  const [couponStatus, setCouponStatus] = useState(null);
-  const [points, setPoints] = useState(0);
-  const [busy, setBusy] = useState(false);
-
-  const maxPointsByTotal = Math.max(0, Math.floor(Math.max(0, subtotal - 1) * 10));
-  const maxPoints = Math.min(auth.user?.points || 0, maxPointsByTotal);
-
-  useEffect(() => {
-    setPoints(0);
-    setCouponInput("");
-    setCouponStatus(null);
-    onChange?.({ couponCode: "", pointsToRedeem: 0, preview: null });
-  }, [items.map((i) => `${i.productId || i.id}:${i.quantity || i.qty}`).join("|"), subtotal]);
-
-  const applyCoupon = async () => {
-    const code = couponInput.trim().toUpperCase();
-    if (!code) return;
-    setBusy(true);
-    setCouponStatus(null);
-    try {
-      const preview = await apiFetch("/api/coupons/validate", {
-        method: "POST",
-        body: JSON.stringify({ items, couponCode: code, pointsToRedeem: points }),
-      });
-      setCouponStatus({ type: "success", message: `Cupom ${preview.couponCode} aplicado.`, preview });
-      setPoints(preview.pointsUsed || 0);
-      onChange?.({ couponCode: preview.couponCode, pointsToRedeem: preview.pointsUsed, preview });
-    } catch (e) {
-      setCouponStatus({ type: "error", message: e.message || "Cupom inválido." });
-      onChange?.({ couponCode: "", pointsToRedeem: 0, preview: null });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const applyPoints = async (value) => {
-    const next = Math.max(0, Math.min(Number(value) || 0, maxPoints));
-    setPoints(next);
-    if (!couponInput.trim()) {
-      onChange?.({ couponCode: "", pointsToRedeem: next, preview: null });
-      return;
-    }
-    setBusy(true);
-    try {
-      const preview = await apiFetch("/api/coupons/validate", {
-        method: "POST",
-        body: JSON.stringify({ items, couponCode: couponInput.trim(), pointsToRedeem: next }),
-      });
-      setCouponStatus({ type: "success", message: `Cupom ${preview.couponCode} aplicado.`, preview });
-      setPoints(preview.pointsUsed || 0);
-      onChange?.({ couponCode: preview.couponCode, pointsToRedeem: preview.pointsUsed, preview });
-    } catch (e) {
-      setCouponStatus({ type: "error", message: e.message || "Não foi possível recalcular o desconto." });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="mc-discount-box">
-      <div className="mc-discount-head">
-        <div>
-          <strong>Descontos</strong>
-          <span>Use cupom e pontos na mesma compra.</span>
-        </div>
-        {auth.user && <span className="mc-points-balance">{auth.user.points || 0} pts</span>}
-      </div>
-
-      <div className="mc-coupon-row">
-        <input
-          className="mc-coupon-input"
-          value={couponInput}
-          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-          placeholder="CÓDIGO DO CUPOM"
-          maxLength={64}
-          aria-label="Código do cupom"
-        />
-        <button className="mc-btn mc-btn-outline mc-btn-sm mc-coupon-apply" onClick={applyCoupon} disabled={busy || !couponInput.trim()}>
-          {busy ? <Loader2 size={14} className="mc-spin" /> : "Aplicar"}
-        </button>
-      </div>
-
-      {auth.user && (
-        <div className="mc-points-row">
-          <div className="mc-points-label">
-            <span>Pontos</span>
-            <strong>{points} pts = {formatPrice(points / 10)}</strong>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max={maxPoints}
-            step="1"
-            value={Math.min(points, maxPoints)}
-            onChange={(e) => applyPoints(e.target.value)}
-            disabled={maxPoints <= 0 || busy}
-            aria-label="Quantidade de pontos para usar"
-          />
-        </div>
-      )}
-
-      {couponStatus?.message && <div className={`mc-discount-status mc-discount-status-${couponStatus.type}`}>{couponStatus.message}</div>}
-      {couponStatus?.preview && (
-        <div className="mc-discount-breakdown">
-          {couponStatus.preview.couponDiscount > 0 && <span>Cupom <b>-{formatPrice(couponStatus.preview.couponDiscount)}</b></span>}
-          {couponStatus.preview.pointsDiscount > 0 && <span>Pontos <b>-{formatPrice(couponStatus.preview.pointsDiscount)}</b></span>}
-        </div>
-      )}
-    </div>
-  );
+  return { items: [{ productId: data.product.id, quantity: qty }] };
 }
 
 function BuyModal({ data, onClose }) {
@@ -1739,14 +1711,13 @@ function BuyModal({ data, onClose }) {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [order, setOrder] = useState(null);
-  const [discount, setDiscount] = useState({ couponCode: "", pointsToRedeem: 0, preview: null });
+  const [discount, setDiscount] = useState({ couponCode: null, pointsToRedeem: 0, discountTotal: 0, finalTotal: 0 });
   const idemKeyRef = useRef(null);
 
   useEffect(() => {
     setQty(1);
     setErrorMsg("");
     setOrder(null);
-    setDiscount({ couponCode: "", pointsToRedeem: 0, preview: null });
     setStep(data?.type === "kit" ? "confirm" : data?.mode === "detail" ? "detail" : "select");
     idemKeyRef.current = null;
   }, [data]);
@@ -1806,7 +1777,12 @@ function BuyModal({ data, onClose }) {
       idemKeyRef.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
     try {
-      const payload = { ...buildOrderPayload(data, qty, discount), idempotencyKey: idemKeyRef.current };
+      const payload = {
+        ...buildOrderPayload(data, qty),
+        idempotencyKey: idemKeyRef.current,
+        couponCode: discount.couponCode || undefined,
+        pointsToRedeem: discount.pointsToRedeem || 0,
+      };
       const res = await apiFetch("/api/orders", { method: "POST", body: JSON.stringify(payload) });
       setOrder(res.order);
       setStep("success");
@@ -1937,15 +1913,23 @@ function BuyModal({ data, onClose }) {
               </div>
             )}
 
-            <CheckoutDiscounts
-              items={isKit ? data.items.map((i) => ({ productId: i.id, quantity: i.qty })) : [{ productId: product.id, quantity: qty }]}
-              subtotal={subtotal}
-              onChange={setDiscount}
-            />
+            <div className="mc-modal-line mc-modal-total">
+              <span>Subtotal</span>
+              <span>{formatPrice(subtotal)}</span>
+            </div>
+
+            <CheckoutDiscounts subtotal={subtotal} onChange={setDiscount} />
+
+            {discount.discountTotal > 0 && (
+              <div className="mc-modal-line">
+                <span>Desconto</span>
+                <span>-{formatPrice(discount.discountTotal)}</span>
+              </div>
+            )}
 
             <div className="mc-modal-line mc-modal-total">
               <span>Total</span>
-              <span>{formatPrice(discount.preview?.total ?? subtotal)}</span>
+              <span>{formatPrice(discount.finalTotal || subtotal)}</span>
             </div>
 
             <div className="mc-modal-ticket-msg">
@@ -2009,7 +1993,7 @@ function CartPanel() {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [order, setOrder] = useState(null);
-  const [discount, setDiscount] = useState({ couponCode: "", pointsToRedeem: 0, preview: null });
+  const [discount, setDiscount] = useState({ couponCode: null, pointsToRedeem: 0, discountTotal: 0, finalTotal: 0 });
   const idemKeyRef = useRef(null);
 
   const onClose = () => {
@@ -2021,7 +2005,6 @@ function CartPanel() {
       setStep("cart");
       setErrorMsg("");
       setOrder(null);
-      setDiscount({ couponCode: "", pointsToRedeem: 0, preview: null });
       idemKeyRef.current = null;
     }, 200);
   };
@@ -2060,8 +2043,6 @@ function CartPanel() {
       const payload = {
         items: cart.items.map((i) => ({ productId: i.id, quantity: i.qty })),
         idempotencyKey: idemKeyRef.current,
-        couponCode: discount.couponCode || undefined,
-        pointsToRedeem: discount.pointsToRedeem || 0,
       };
       const res = await apiFetch("/api/orders", { method: "POST", body: JSON.stringify(payload) });
       setOrder(res.order);
@@ -2162,15 +2143,23 @@ function CartPanel() {
               ))}
             </ul>
 
-            <CheckoutDiscounts
-              items={cart.items.map((i) => ({ productId: i.id, quantity: i.qty }))}
-              subtotal={cart.total}
-              onChange={setDiscount}
-            />
+            <div className="mc-modal-line mc-modal-total">
+              <span>Subtotal</span>
+              <span>{formatPrice(cart.total)}</span>
+            </div>
+
+            <CheckoutDiscounts subtotal={cart.total} onChange={setDiscount} />
+
+            {discount.discountTotal > 0 && (
+              <div className="mc-modal-line">
+                <span>Desconto</span>
+                <span>-{formatPrice(discount.discountTotal)}</span>
+              </div>
+            )}
 
             <div className="mc-modal-line mc-modal-total">
               <span>Total</span>
-              <span>{formatPrice(discount.preview?.total ?? cart.total)}</span>
+              <span>{formatPrice(discount.finalTotal || cart.total)}</span>
             </div>
 
             <div className="mc-modal-ticket-msg">
@@ -2293,7 +2282,7 @@ function AccountPanel({ onClose }) {
   const cart = useCartCtx();
   const [orders, setOrders] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [buyingAgain, setBuyingAgain] = useState(null);
+  const [reorderedId, setReorderedId] = useState(null);
 
   useEffect(() => {
     apiFetch("/api/orders")
@@ -2302,18 +2291,16 @@ function AccountPanel({ onClose }) {
   }, []);
 
   const buyAgain = (order) => {
-    const validItems = (order.items || [])
-      .filter((item) => item.active && item.productId && STORE_PRODUCT_BY_ID[item.productId])
-      .map((item) => ({ product: STORE_PRODUCT_BY_ID[item.productId], quantity: item.quantity }));
-    if (!validItems.length) {
-      setErrorMsg("Os produtos deste pedido não estão mais disponíveis.");
-      return;
-    }
-    setBuyingAgain(order.id);
-    validItems.forEach(({ product, quantity }) => cart.addItem(product, quantity));
-    setBuyingAgain(null);
-    onClose();
-    cart.setOpen(true);
+    const activeItems = order.items.filter((i) => i.product?.active && i.product?.slug);
+    if (activeItems.length === 0) return;
+    activeItems.forEach((i) => {
+      cart.addItem({ id: i.product.slug, name: i.nameSnapshot, price: Number(i.unitPrice) }, i.quantity);
+    });
+    setReorderedId(order.id);
+    setTimeout(() => {
+      onClose();
+      cart.setOpen(true);
+    }, 700);
   };
 
   return (
@@ -2323,9 +2310,13 @@ function AccountPanel({ onClose }) {
           <X size={18} />
         </button>
         <h3 className="mc-modal-title">Minha conta</h3>
-        <div className="mc-account-summary">
-          <div className="mc-modal-line"><span>Discord</span><span>@{auth.user?.username}</span></div>
-          <div className="mc-modal-line"><span>Pontos</span><strong className="mc-account-points">{auth.user?.points || 0} pts</strong></div>
+        <div className="mc-modal-line">
+          <span>Discord</span>
+          <span>@{auth.user?.username}</span>
+        </div>
+        <div className="mc-modal-line">
+          <span>⭐ Pontos de fidelidade</span>
+          <span className="mc-account-points">{auth.user?.points ?? 0}</span>
         </div>
 
         <h4 className="mc-account-orders-title"><Package size={14} /> Pedidos</h4>
@@ -2333,23 +2324,24 @@ function AccountPanel({ onClose }) {
         {!orders && !errorMsg && <p className="mc-modal-desc">Carregando pedidos...</p>}
         {orders && orders.length === 0 && <p className="mc-modal-desc">Você ainda não fez nenhum pedido.</p>}
         {orders && orders.length > 0 && (
-          <ul className="mc-account-orders-list">
-            {orders.map((o) => (
-              <li key={o.id}>
-                <div className="mc-account-order-main">
-                  <div><strong>#{o.code}</strong> <span>{formatPrice(o.total)}</span></div>
-                  <small>{ORDER_STATUS_LABEL[o.status] || o.status}</small>
-                </div>
-                <button
-                  className="mc-btn mc-btn-outline mc-btn-sm mc-buy-again-btn"
-                  onClick={() => buyAgain(o)}
-                  disabled={buyingAgain === o.id || !o.items?.some((item) => item.active && item.productId && STORE_PRODUCT_BY_ID[item.productId])}
-                >
-                  {buyingAgain === o.id ? <Loader2 size={13} className="mc-spin" /> : <ShoppingCart size={13} />}
-                  Comprar de novo
-                </button>
-              </li>
-            ))}
+          <ul className="mc-modal-kit-list mc-account-orders-list">
+            {orders.map((o) => {
+              const canReorder = o.items?.some((i) => i.product?.active);
+              return (
+                <li key={o.id} className="mc-account-order-item">
+                  <div className="mc-account-order-row">
+                    <span>#{o.code} — {formatPrice(o.total)}</span>
+                    <span>{ORDER_STATUS_LABEL[o.status] || o.status}</span>
+                  </div>
+                  {canReorder && (
+                    <button className="mc-btn mc-btn-outline mc-btn-xs mc-account-reorder-btn" onClick={() => buyAgain(o)}>
+                      {reorderedId === o.id ? <Check size={13} /> : <ShoppingCart size={13} />}
+                      {reorderedId === o.id ? "Adicionado!" : "Comprar de novo"}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -2546,36 +2538,61 @@ const CSS = `
 
 /* ---------- Navbar ---------- */
 .mc-nav{
-  position:sticky; top:0; z-index:60; background:rgba(5,7,10,0.72);
-  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-  border-bottom:1px solid transparent; transition:background 0.3s ease, border-color 0.3s ease;
+  position:sticky; top:0; z-index:60;
+  background:rgba(5,7,10,0.55);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;
+  transition:background 0.3s ease, border-color 0.3s ease;
 }
-.mc-nav-scrolled{ background:rgba(5,7,10,0.92); border-bottom:1px solid var(--border); }
-.mc-nav-inner{ max-width:1240px; margin:0 auto; display:flex; align-items:center; gap:8px; padding:8px 12px; min-height:52px; }
-.mc-nav-spacer{ flex:1; }
-.mc-nav-actions{ display:flex; align-items:center; gap:6px; }
-.mc-nav-burger, .mc-nav-mobile-close{
-  background:rgba(23,33,49,0.74); border:1px solid var(--border); color:var(--white);
-  width:36px; height:36px; border-radius:9px; display:flex; align-items:center; justify-content:center; padding:0;
+.mc-nav-scrolled{
+  background:rgba(5,7,10,0.86);
+  border-bottom:1px solid var(--border);
 }
-.mc-icon-btn{ width:36px; height:36px; padding:0; border-radius:9px; }
+.mc-nav-inner{
+  max-width:1240px; margin:0 auto;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 24px;
+}
+.mc-nav-logo-btn{ background:none; border:none; padding:0; }
+.mc-nav-links{ display:none; gap:6px; }
+.mc-nav-link{
+  background:none; border:none; color:var(--muted);
+  font-size:13.5px; font-weight:600; padding:8px 12px; border-radius:8px;
+  transition:color 0.2s ease, background 0.2s ease;
+  white-space:nowrap;
+}
+.mc-nav-link:hover{ color:var(--white); background:rgba(59,130,246,0.1); }
+.mc-nav-actions{ display:flex; align-items:center; gap:8px; }
+.mc-nav-buy-btn{ display:none; }
+@media (min-width:480px){
+  .mc-nav-actions{ gap:10px; }
+  .mc-nav-buy-btn{ display:inline-flex; }
+}
+.mc-nav-burger{
+  background:rgba(23,33,49,0.7); border:1px solid var(--border);
+  color:var(--white); width:40px; height:40px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+}
 .mc-nav-mobile{
-  position:absolute; left:8px; right:8px; top:calc(100% + 8px); max-height:0; overflow:hidden; opacity:0;
-  background:linear-gradient(160deg, rgba(23,33,49,0.98), rgba(5,7,10,0.99));
-  border:1px solid transparent; border-radius:16px; box-shadow:0 18px 45px rgba(0,0,0,0.55);
-  transform:translateY(-5px); transition:max-height 0.3s ease, opacity 0.2s ease, transform 0.25s ease;
-  padding:0 14px; pointer-events:none;
+  max-height:0; overflow:hidden; opacity:0;
+  transition:max-height 0.35s ease, opacity 0.25s ease;
+  padding:0 20px; display:flex; flex-direction:column; gap:2px;
 }
-.mc-nav-mobile-open{ max-height:780px; opacity:1; transform:translateY(0); padding:12px 14px 16px; border-color:var(--border); pointer-events:auto; }
-.mc-nav-mobile-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.06); }
-.mc-nav-mobile-logo{ background:none; border:none; padding:0; color:var(--white); }
-.mc-nav-mobile-links{ padding:5px 0 6px; }
+.mc-nav-mobile-open{ max-height:520px; opacity:1; padding:6px 20px 20px; border-top:1px solid var(--border); }
 .mc-nav-mobile-link{
-  width:100%; display:flex; align-items:center; justify-content:space-between; background:none; border:none; color:var(--white);
-  text-align:left; padding:11px 2px; font-size:13px; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.05);
+  display:flex; align-items:center; justify-content:space-between;
+  background:none; border:none; color:var(--white); text-align:left;
+  padding:13px 4px; font-size:14.5px; font-weight:600;
+  border-bottom:1px solid rgba(255,255,255,0.05);
 }
-.mc-nav-mobile .mc-btn{ margin-top:10px; }
-@media (min-width:640px){ .mc-nav-inner{ padding:8px 18px; } .mc-nav-mobile{ left:18px; right:auto; width:360px; } }
+.mc-nav-mobile .mc-btn{ margin-top:14px; }
+
+@media (min-width:1024px){
+  .mc-nav-links{ display:flex; }
+  .mc-nav-burger{ display:none; }
+  .mc-nav-mobile{ display:none; }
+}
 
 /* ---------- Buttons ---------- */
 .mc-btn{
@@ -2606,6 +2623,7 @@ const CSS = `
 }
 .mc-btn-outline:hover:not(:disabled){ background:rgba(59,130,246,0.1); border-color:var(--blue-400); }
 .mc-btn-sm{ padding:9px 16px; font-size:13px; }
+.mc-nav-icon-btn.mc-btn-sm{ padding:9px; width:38px; height:38px; }
 .mc-btn-xs{ padding:8px 12px; font-size:12.5px; border-radius:9px; }
 .mc-btn-lg{ padding:15px 26px; font-size:15px; border-radius:14px; }
 .mc-btn-block{ width:100%; }
@@ -3048,32 +3066,37 @@ const CSS = `
 .mc-cart-item-price{ font-size:11.5px; color:var(--muted); }
 .mc-cart-item-remove{ background:none; border:none; color:#f87171; padding:4px; display:flex; flex-shrink:0; }
 
-/* ---------- Descontos / Fidelidade ---------- */
+/* ---------- Desconto (cupom + pontos) ---------- */
 .mc-discount-box{
-  margin:14px 0 6px; padding:13px;
-  background:rgba(59,130,246,0.055); border:1px solid var(--border); border-radius:13px;
+  background:var(--panel); border:1px solid var(--border); border-radius:14px;
+  padding:14px; margin:14px 0; display:flex; flex-direction:column; gap:12px;
 }
-.mc-discount-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
-.mc-discount-head strong{ display:block; font-size:12px; }
-.mc-discount-head span{ display:block; font-size:10.5px; color:var(--muted); margin-top:3px; }
-.mc-points-balance{ color:var(--blue-400)!important; font-family:var(--font-mono); font-weight:700; white-space:nowrap; }
-.mc-coupon-row{ display:flex; gap:7px; }
+.mc-coupon-row{ display:flex; gap:8px; }
 .mc-coupon-input{
-  min-width:0; flex:1; background:rgba(5,7,10,0.72); color:var(--white); border:1px solid var(--border);
-  border-radius:9px; padding:9px 10px; font-size:11.5px; outline:none; text-transform:uppercase;
+  flex:1; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px;
+  padding:9px 12px; color:var(--white); font-size:13px; font-family:var(--font-mono); letter-spacing:0.5px;
+  outline:none; text-transform:uppercase;
 }
-.mc-coupon-input:focus{ border-color:rgba(96,165,250,0.5); box-shadow:0 0 0 3px rgba(59,130,246,0.08); }
-.mc-coupon-apply{ margin-top:0!important; padding:8px 11px; font-size:11.5px; }
-.mc-points-row{ margin-top:11px; }
-.mc-points-label{ display:flex; justify-content:space-between; gap:10px; margin-bottom:7px; font-size:11.5px; color:var(--muted); }
-.mc-points-label strong{ color:var(--white); font-family:var(--font-mono); font-size:10.5px; }
-.mc-points-row input[type="range"]{ width:100%; accent-color:var(--blue-500); }
-.mc-discount-status{ margin-top:8px; padding:7px 8px; border-radius:8px; font-size:10.5px; }
-.mc-discount-status-success{ color:#86efac; background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.18); }
-.mc-discount-status-error{ color:#fca5a5; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.18); }
-.mc-discount-breakdown{ display:flex; flex-direction:column; gap:4px; margin-top:8px; font-size:10.5px; color:var(--muted); }
-.mc-discount-breakdown span{ display:flex; justify-content:space-between; }
-.mc-discount-breakdown b{ color:#86efac; }
+.mc-coupon-input:focus{ border-color:var(--blue-500); }
+.mc-coupon-input::placeholder{ color:var(--muted); text-transform:none; letter-spacing:normal; font-family:var(--font-body); }
+.mc-coupon-applied{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); border-radius:10px;
+  padding:9px 12px; font-size:12.5px; color:#D6E2F5;
+}
+.mc-coupon-remove{ background:none; border:none; color:#f87171; display:flex; flex-shrink:0; }
+.mc-coupon-error{ font-size:12px; color:#FCA5A5; margin:0; }
+.mc-points-row{ display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--border); padding-top:12px; }
+.mc-points-label{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; }
+.mc-points-value{ font-family:var(--font-mono); font-weight:700; color:var(--blue-400); }
+.mc-points-slider{ width:100%; accent-color:var(--blue-500); }
+.mc-points-count{ font-size:11px; color:var(--muted); text-align:right; }
+
+/* ---------- Conta: pontos + comprar de novo ---------- */
+.mc-account-points{ font-family:var(--font-mono); font-weight:800; color:var(--blue-400); }
+.mc-account-order-item{ display:flex; flex-direction:column; gap:8px; }
+.mc-account-order-row{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; width:100%; }
+.mc-account-reorder-btn{ align-self:flex-start; }
 
 /* ---------- Footer ---------- */
 .mc-footer{
@@ -3109,13 +3132,5 @@ const CSS = `
   font-size:13px; text-transform:uppercase; letter-spacing:0.6px; color:var(--blue-400);
   margin:22px 0 12px;
 }
-.mc-account-summary{ margin-bottom:2px; }
-.mc-account-points{ color:var(--blue-400); font-family:var(--font-mono); }
-.mc-account-orders-list{ display:flex; flex-direction:column; gap:8px; max-height:310px; overflow-y:auto; }
-.mc-account-orders-list li{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:11px; padding:10px; }
-.mc-account-order-main{ min-width:0; }
-.mc-account-order-main div{ display:flex; align-items:center; gap:7px; font-size:12px; }
-.mc-account-order-main div span{ color:var(--blue-400); font-family:var(--font-mono); }
-.mc-account-order-main small{ color:var(--muted); font-size:10.5px; display:block; margin-top:4px; }
-.mc-buy-again-btn{ margin-top:0!important; padding:7px 9px; font-size:10.5px; }
+.mc-account-orders-list li{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
 `;
