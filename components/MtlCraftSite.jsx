@@ -88,11 +88,25 @@ function formatPrice(n) {
    ============================================================================ */
 
 async function apiFetch(url, options = {}) {
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
+  // Evita que qualquer API pendurada deixe a interface presa em "carregando"
+  // para sempre (especialmente /api/auth/me em ambientes com banco indisponível).
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? 12000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const { timeoutMs: _timeoutMs, signal: externalSignal, ...fetchOptions } = options;
+  const signal = externalSignal || controller.signal;
+
+  let res;
+  try {
+    res = await fetch(url, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
+      ...fetchOptions,
+      signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
   let body = null;
   try {
     body = await res.json();
@@ -158,10 +172,14 @@ function AuthProvider({ children }) {
       const data = await apiFetch("/api/auth/me");
 
       if (data.authError) {
-        // Falha temporária do servidor/banco (ex.: Neon indisponível por um
-        // instante). Isso NÃO significa que o usuário saiu — mantém o que já
-        // sabíamos em vez de derrubar a sessão silenciosamente.
-        return userRef.current === undefined ? null : userRef.current;
+        // Nunca deixe o estado de autenticação preso em "carregando".
+        // O usuário pode tentar novamente e, se já havia uma sessão conhecida,
+        // preservamos essa sessão visualmente.
+        if (userRef.current === undefined) {
+          setUser(null);
+          userRef.current = null;
+        }
+        return userRef.current;
       }
 
       const nextUser = data.user || null;
