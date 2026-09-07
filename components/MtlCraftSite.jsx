@@ -740,7 +740,7 @@ function Navbar({ onBuyClick }) {
         <div className="mc-nav-actions">
           <CartButton size="sm" />
           <AccountButton size="sm" />
-          <button className="mc-btn mc-btn-primary mc-btn-sm" onClick={() => go("#catalogo")}>
+          <button className="mc-btn mc-btn-primary mc-btn-sm mc-nav-buy-btn" onClick={() => go("#catalogo")}>
             <ShoppingCart size={15} />
             Comprar agora
           </button>
@@ -2394,7 +2394,12 @@ const CSS = `
   white-space:nowrap;
 }
 .mc-nav-link:hover{ color:var(--white); background:rgba(59,130,246,0.1); }
-.mc-nav-actions{ display:flex; align-items:center; gap:10px; }
+.mc-nav-actions{ display:flex; align-items:center; gap:8px; }
+.mc-nav-buy-btn{ display:none; }
+@media (min-width:480px){
+  .mc-nav-actions{ gap:10px; }
+  .mc-nav-buy-btn{ display:inline-flex; }
+}
 .mc-nav-burger{
   background:rgba(23,33,49,0.7); border:1px solid var(--border);
   color:var(--white); width:40px; height:40px; border-radius:10px;
