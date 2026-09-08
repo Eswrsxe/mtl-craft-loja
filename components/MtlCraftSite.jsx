@@ -2579,7 +2579,7 @@ const CSS = `
   transition:max-height 0.35s ease, opacity 0.25s ease;
   padding:0 20px; display:flex; flex-direction:column; gap:2px;
 }
-.mc-nav-mobile-open{ max-height:520px; opacity:1; padding:6px 20px 20px; border-top:1px solid var(--border); }
+.mc-nav-mobile-open{ max-height:85vh; max-height:85dvh; opacity:1; padding:6px 20px 20px; border-top:1px solid var(--border); overflow-y:auto; }
 .mc-nav-mobile-link{
   display:flex; align-items:center; justify-content:space-between;
   background:none; border:none; color:var(--white); text-align:left;
@@ -3119,7 +3119,7 @@ const CSS = `
 .mc-footer-note{ opacity:0.7; }
 
 /* ---------- Autenticação / Conta (novo) ---------- */
-.mc-nav-mobile-account{ margin-top:10px; }
+.mc-nav-mobile-account{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
 .mc-spin{ animation:mcSpin 0.8s linear infinite; }
 @keyframes mcSpin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
 .mc-auth-error{
