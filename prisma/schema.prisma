@@ -92,6 +92,8 @@ model Order {
   status         OrderStatus    @default(PENDING_PAYMENT)
   approvedBy     String?
   approvedAt     DateTime?
+  rejectedBy     String?
+  rejectedAt     DateTime?
   deliveredBy    String?
   deliveredAt    DateTime?
   createdAt      DateTime       @default(now())
