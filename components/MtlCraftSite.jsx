@@ -915,32 +915,25 @@ function CategoriesSection({ onSelect }) {
 
 /* ------------------------------ PRODUCT CARD -------------------------------- */
 
-// Cupom de desconto + resgate de pontos — usado tanto na compra direta
-// quanto no checkout do carrinho. Avisa o total final pro componente pai via
-// onChange; quem realmente valida de novo e aplica de verdade é o backend
-// na hora de criar o pedido (isso aqui é só preview/UX).
+// Cupom de desconto — usado tanto na compra direta quanto no checkout do
+// carrinho. Avisa o total final pro componente pai via onChange; quem
+// realmente valida de novo e aplica de verdade é o backend na hora de criar
+// o pedido (isso aqui é só preview/UX).
 function CheckoutDiscounts({ subtotal, onChange }) {
-  const auth = useAuthCtx();
-  const userPoints = auth.user?.points || 0;
   const [couponInput, setCouponInput] = useState("");
   const [couponApplied, setCouponApplied] = useState(null);
   const [couponError, setCouponError] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   const maxDiscountRoom = Math.max(0, subtotal - 1);
-  const couponDiscount = couponApplied?.discountAmount || 0;
-  const roomLeftForPoints = Math.max(0, maxDiscountRoom - couponDiscount);
-  const maxRedeemablePoints = Math.min(userPoints, Math.floor(roomLeftForPoints * 10));
-  const cappedPoints = Math.min(pointsToRedeem, maxRedeemablePoints);
-  const pointsDiscount = Math.round((cappedPoints / 10) * 100) / 100;
-  const discountTotal = Math.round((couponDiscount + pointsDiscount) * 100) / 100;
+  let discountTotal = couponApplied?.discountAmount || 0;
+  if (discountTotal > maxDiscountRoom) discountTotal = maxDiscountRoom;
   const finalTotal = Math.round((subtotal - discountTotal) * 100) / 100;
 
   useEffect(() => {
-    onChange({ couponCode: couponApplied?.code || null, pointsToRedeem: cappedPoints, discountTotal, finalTotal });
+    onChange({ couponCode: couponApplied?.code || null, discountTotal, finalTotal });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [couponApplied, cappedPoints, subtotal]);
+  }, [couponApplied, subtotal]);
 
   const applyCoupon = async () => {
     if (!couponInput.trim()) return;
@@ -995,26 +988,6 @@ function CheckoutDiscounts({ subtotal, onChange }) {
         </div>
       )}
       {couponError && <p className="mc-coupon-error">{couponError}</p>}
-
-      {userPoints > 0 && (
-        <div className="mc-points-row">
-          <div className="mc-points-label">
-            <span>⭐ Usar pontos ({userPoints} disponíveis)</span>
-            <span className="mc-points-value">-{formatPrice(pointsDiscount)}</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={maxRedeemablePoints}
-            step={10}
-            value={cappedPoints}
-            onChange={(e) => setPointsToRedeem(Number(e.target.value))}
-            disabled={maxRedeemablePoints === 0}
-            className="mc-points-slider"
-          />
-          <div className="mc-points-count">{cappedPoints} pontos (10 pontos = R$1,00 de desconto)</div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1756,7 +1729,7 @@ function BuyModal({ data, onClose }) {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [order, setOrder] = useState(null);
-  const [discount, setDiscount] = useState({ couponCode: null, pointsToRedeem: 0, discountTotal: 0, finalTotal: 0 });
+  const [discount, setDiscount] = useState({ couponCode: null, discountTotal: 0, finalTotal: 0 });
   const idemKeyRef = useRef(null);
 
   useEffect(() => {
@@ -1826,7 +1799,6 @@ function BuyModal({ data, onClose }) {
         ...buildOrderPayload(data, qty),
         idempotencyKey: idemKeyRef.current,
         couponCode: discount.couponCode || undefined,
-        pointsToRedeem: discount.pointsToRedeem || 0,
       };
       const res = await apiFetch("/api/orders", { method: "POST", body: JSON.stringify(payload) });
       setOrder(res.order);
@@ -2038,7 +2010,7 @@ function CartPanel() {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [order, setOrder] = useState(null);
-  const [discount, setDiscount] = useState({ couponCode: null, pointsToRedeem: 0, discountTotal: 0, finalTotal: 0 });
+  const [discount, setDiscount] = useState({ couponCode: null, discountTotal: 0, finalTotal: 0 });
   const idemKeyRef = useRef(null);
 
   const onClose = () => {
@@ -2358,10 +2330,6 @@ function AccountPanel({ onClose }) {
         <div className="mc-modal-line">
           <span>Discord</span>
           <span>@{auth.user?.username}</span>
-        </div>
-        <div className="mc-modal-line">
-          <span>⭐ Pontos de fidelidade</span>
-          <span className="mc-account-points">{auth.user?.points ?? 0}</span>
         </div>
 
         <h4 className="mc-account-orders-title"><Package size={14} /> Pedidos</h4>
@@ -3139,14 +3107,8 @@ const CSS = `
 }
 .mc-coupon-remove{ background:none; border:none; color:#f87171; display:flex; flex-shrink:0; }
 .mc-coupon-error{ font-size:12px; color:#FCA5A5; margin:0; }
-.mc-points-row{ display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--border); padding-top:12px; }
-.mc-points-label{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; }
-.mc-points-value{ font-family:var(--font-mono); font-weight:700; color:var(--blue-400); }
-.mc-points-slider{ width:100%; accent-color:var(--blue-500); }
-.mc-points-count{ font-size:11px; color:var(--muted); text-align:right; }
 
-/* ---------- Conta: pontos + comprar de novo ---------- */
-.mc-account-points{ font-family:var(--font-mono); font-weight:800; color:var(--blue-400); }
+/* ---------- Conta: comprar de novo ---------- */
 .mc-account-order-item{ display:flex; flex-direction:column; gap:8px; }
 .mc-account-orders-list{ max-height:280px; }
 .mc-account-order-row{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; width:100%; }
