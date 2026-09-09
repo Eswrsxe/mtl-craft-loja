@@ -15,7 +15,6 @@ model User {
   username      String
   discriminator String?
   avatar        String?
-  points        Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orders        Order[]
@@ -86,8 +85,6 @@ model Order {
   subtotal       Decimal        @db.Decimal(10, 2)
   couponCode     String?
   discountAmount Decimal        @default(0) @db.Decimal(10, 2)
-  pointsUsed     Int            @default(0)
-  pointsEarned   Int            @default(0)
   total          Decimal        @db.Decimal(10, 2)
   status         OrderStatus    @default(PENDING_PAYMENT)
   approvedBy     String?
