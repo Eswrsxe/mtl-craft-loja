@@ -812,6 +812,28 @@ function Particles({ count = 22 }) {
   );
 }
 
+function TrustBadge() {
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/reviews/summary")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.count > 0) setSummary(res);
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!summary) return null;
+
+  return (
+    <span className="mc-trust-badge">
+      <Star size={13} className="mc-star-filled" />
+      {summary.avgOverall.toFixed(1)} · {summary.count} avaliaç{summary.count === 1 ? "ão" : "ões"}
+    </span>
+  );
+}
+
 function Hero({ onGoCatalog, onGoVip }) {
   return (
     <section id="inicio" className="mc-hero">
@@ -821,9 +843,12 @@ function Hero({ onGoCatalog, onGoVip }) {
 
       <div className="mc-hero-content">
         <Reveal>
-          <span className="mc-eyebrow">
-            <Zap size={13} /> Loja oficial do servidor
-          </span>
+          <div className="mc-eyebrow-row">
+            <span className="mc-eyebrow">
+              <Zap size={13} /> Loja oficial do servidor
+            </span>
+            <TrustBadge />
+          </div>
         </Reveal>
         <Reveal delay={80}>
           <h1 className="mc-hero-title">
@@ -1069,7 +1094,7 @@ function ProductReviews({ slug }) {
   );
 }
 
-function ProductCard({ product, onBuy, featuredStyle = false, index = 0 }) {
+function ProductCard({ product, onBuy, featuredStyle = false, index = 0, rating = null }) {
   const meta = CATEGORY_META[product.category];
   const Icon = meta?.icon ?? Sword;
 
@@ -1116,6 +1141,11 @@ function ProductCard({ product, onBuy, featuredStyle = false, index = 0 }) {
         </div>
 
         <h3 className="mc-card-name">{product.name}</h3>
+        {rating && (
+          <span className="mc-card-rating">
+            <Star size={11} className="mc-star-filled" /> {rating.avgOverall.toFixed(1)} ({rating.count})
+          </span>
+        )}
         <p className="mc-card-desc">{product.desc}</p>
 
         {product.stock !== undefined && (
@@ -1191,6 +1221,14 @@ function CatalogSection({ onBuy }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("todos");
   const [sort, setSort] = useState("relevancia");
+  const [ratings, setRatings] = useState({});
+
+  useEffect(() => {
+    fetch("/api/reviews/ratings")
+      .then((r) => r.json())
+      .then((res) => setRatings(res.ratings || {}))
+      .catch(() => {});
+  }, []);
 
   const results = useMemo(() => {
     let list = catalogProducts.filter((p) =>
@@ -1204,9 +1242,15 @@ function CatalogSection({ onBuy }) {
       list = [...list].sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
     } else if (sort === "nome") {
       list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === "avaliacao") {
+      list = [...list].sort((a, b) => {
+        const ra = ratings[a.id]?.avgOverall ?? -1;
+        const rb = ratings[b.id]?.avgOverall ?? -1;
+        return rb - ra;
+      });
     }
     return list;
-  }, [query, filter, sort]);
+  }, [query, filter, sort, ratings]);
 
   return (
     <section id="catalogo" className="mc-section">
@@ -1231,6 +1275,7 @@ function CatalogSection({ onBuy }) {
             <option value="menor">Menor preço</option>
             <option value="maior">Maior preço</option>
             <option value="nome">Nome (A-Z)</option>
+            <option value="avaliacao">Mais bem avaliados</option>
           </select>
         </div>
 
@@ -1252,7 +1297,7 @@ function CatalogSection({ onBuy }) {
       ) : (
         <div className="mc-grid mc-grid-4">
           {results.map((p, i) => (
-            <ProductCard key={p.id} product={p} onBuy={onBuy} index={i} />
+            <ProductCard key={p.id} product={p} onBuy={onBuy} index={i} rating={ratings[p.id]} />
           ))}
         </div>
       )}
@@ -2661,12 +2706,18 @@ const CSS = `
   animation-name:mcFloatUp; animation-timing-function:linear; animation-iteration-count:infinite;
 }
 .mc-hero-content{ position:relative; max-width:760px; margin:0 auto; }
+.mc-eyebrow-row{ display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px; margin-bottom:22px; }
 .mc-eyebrow{
   display:inline-flex; align-items:center; gap:6px;
   font-size:12px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
   color:var(--blue-400); background:rgba(59,130,246,0.1);
   border:1px solid rgba(96,165,250,0.3); padding:7px 14px; border-radius:999px;
-  margin-bottom:22px;
+}
+.mc-trust-badge{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:12px; font-weight:700; color:#FBBF24;
+  background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.3);
+  padding:7px 14px; border-radius:999px;
 }
 .mc-hero-title{
   font-family:var(--font-display); font-weight:800;
@@ -2784,6 +2835,7 @@ const CSS = `
   border:1px solid rgba(96,165,250,0.25); padding:5px 9px; border-radius:999px;
 }
 .mc-card-name{ font-size:16.5px; font-weight:800; margin:0; letter-spacing:0.2px; }
+.mc-card-rating{ display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:#FBBF24; font-weight:700; margin-top:-4px; }
 .mc-card-desc{ font-size:13px; color:var(--muted); line-height:1.55; margin:0; flex:1; }
 .mc-card-stock{ font-size:12px; color:var(--muted); margin:0; }
 .mc-card-bottom{ display:flex; align-items:flex-end; justify-content:space-between; gap:10px; margin-top:4px; }
