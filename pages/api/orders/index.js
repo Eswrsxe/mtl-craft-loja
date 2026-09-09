@@ -16,7 +16,6 @@ export default async function handler(req, res) {
         total: true,
         status: true,
         createdAt: true,
-        pointsEarned: true,
         items: { select: { productId: true, nameSnapshot: true, quantity: true, unitPrice: true, product: { select: { slug: true, active: true } } } },
       },
     });
@@ -30,13 +29,8 @@ export default async function handler(req, res) {
   return res.status(405).json({ error: "Método não permitido" });
 }
 
-// Taxas do programa de fidelidade: quem gasta ganha, e pode trocar por
-// desconto depois. Fica tudo num só lugar pra facilitar ajustar no futuro.
-const POINTS_PER_REAL_SPENT = 1; // 1 ponto ganho a cada R$1 gasto (creditado só quando o pedido é ENTREGUE, não na hora da compra)
-const POINTS_REDEEM_RATE = 10; // 10 pontos = R$1,00 de desconto
-
 async function createOrder(req, res, session) {
-  const { items, idempotencyKey, couponCode, pointsToRedeem } = req.body || {};
+  const { items, idempotencyKey, couponCode } = req.body || {};
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Carrinho vazio." });
@@ -45,13 +39,6 @@ async function createOrder(req, res, session) {
     if (!it || typeof it.productId !== "string" || !Number.isInteger(it.quantity) || it.quantity < 1 || it.quantity > 99) {
       return res.status(400).json({ error: "Item de pedido inválido." });
     }
-  }
-  let requestedPoints = 0;
-  if (pointsToRedeem !== undefined) {
-    if (!Number.isInteger(pointsToRedeem) || pointsToRedeem < 0) {
-      return res.status(400).json({ error: "Quantidade de pontos inválida." });
-    }
-    requestedPoints = pointsToRedeem;
   }
 
   // Reaproveita o pedido já criado se o mesmo clique tiver sido reenviado
@@ -126,31 +113,12 @@ async function createOrder(req, res, session) {
   }
 
   // Garante pelo menos R$1,00 a pagar (não faz sentido gerar um pedido de
-  // R$0,00 via PIX). O cupom nunca é reduzido por causa disso — só os
-  // pontos resgatados são ajustados pra caber na sobra.
+  // R$0,00 via PIX).
   const maxTotalDiscount = Math.max(0, subtotal - 1);
   if (couponDiscount > maxTotalDiscount) couponDiscount = maxTotalDiscount;
 
-  // ---- Pontos de fidelidade (opcional) ----
-  let pointsUsed = 0;
-  let pointsDiscount = 0;
-  if (requestedPoints > 0) {
-    const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { points: true } });
-    if (!user || requestedPoints > user.points) {
-      return res.status(400).json({ error: "Você não tem pontos suficientes para esse resgate." });
-    }
-    const desiredDiscount = requestedPoints / POINTS_REDEEM_RATE;
-    const roomLeft = Math.max(0, maxTotalDiscount - couponDiscount);
-    pointsDiscount = Math.min(desiredDiscount, roomLeft);
-    // Arredonda pra baixo pro múltiplo de pontos correspondente, pra nunca
-    // descontar mais pontos do saldo do que o desconto realmente aplicado.
-    pointsUsed = Math.floor(pointsDiscount * POINTS_REDEEM_RATE);
-    pointsDiscount = Math.round((pointsUsed / POINTS_REDEEM_RATE) * 100) / 100;
-  }
-
-  const discountAmount = Math.round((couponDiscount + pointsDiscount) * 100) / 100;
+  const discountAmount = Math.round(couponDiscount * 100) / 100;
   const total = Math.round((subtotal - discountAmount) * 100) / 100;
-  const pointsEarned = Math.floor(total * POINTS_PER_REAL_SPENT);
 
   const code = await generateUniqueOrderCode(prisma);
 
@@ -169,16 +137,6 @@ async function createOrder(req, res, session) {
         await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
       }
 
-      // Trava o saldo de pontos de forma atômica (evita saldo negativo em
-      // compras simultâneas).
-      if (pointsUsed > 0) {
-        const updated = await tx.user.updateMany({
-          where: { id: session.userId, points: { gte: pointsUsed } },
-          data: { points: { decrement: pointsUsed } },
-        });
-        if (updated.count === 0) throw new Error("POINTS_INSUFFICIENT");
-      }
-
       return tx.order.create({
         data: {
           code,
@@ -187,8 +145,6 @@ async function createOrder(req, res, session) {
           subtotal,
           couponCode: coupon ? coupon.code : null,
           discountAmount,
-          pointsUsed,
-          pointsEarned,
           total,
           items: { create: orderItemsData },
         },
@@ -198,9 +154,6 @@ async function createOrder(req, res, session) {
   } catch (e) {
     if (e.message === "COUPON_EXHAUSTED") {
       return res.status(400).json({ error: "Esse cupom acabou de atingir o limite de usos." });
-    }
-    if (e.message === "POINTS_INSUFFICIENT") {
-      return res.status(400).json({ error: "Você não tem pontos suficientes para esse resgate." });
     }
     // Corrida rara em cima da mesma idempotencyKey: devolve o pedido já criado.
     if (idempotencyKey) {
@@ -222,8 +175,6 @@ async function createOrder(req, res, session) {
       total: order.total,
       status: order.status,
       discountAmount: order.discountAmount,
-      pointsUsed: order.pointsUsed,
-      pointsEarned: order.pointsEarned,
     },
   });
 }
