@@ -1,5 +1,6 @@
 const { prisma } = require("../../../../lib/prisma");
 const { setSessionCookie, parseCookies } = require("../../../../lib/session");
+const { getDiscordConfig } = require("../../../../lib/discordEnv");
 
 export default async function handler(req, res) {
   const { code, state, error } = req.query;
@@ -17,22 +18,44 @@ export default async function handler(req, res) {
     return res.status(400).send("Código de autorização ausente.");
   }
 
+  const { clientId, clientSecret, redirectUri, problems } = getDiscordConfig();
+  if (problems.length) {
+    console.error("Configuração do Discord OAuth2 inválida:", problems.join(" | "));
+    res.redirect(302, "/?authError=1");
+    return;
+  }
+
   try {
     // 1) Troca o code pelo access_token
+    // Credenciais enviadas via HTTP Basic (formato recomendado pela doc do Discord).
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
     const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${basic}`,
+      },
       body: new URLSearchParams({
-        client_id: process.env.DISCORD_CLIENT_ID,
-        client_secret: process.env.DISCORD_CLIENT_SECRET,
         grant_type: "authorization_code",
         code: String(code),
-        redirect_uri: process.env.DISCORD_REDIRECT_URI,
+        redirect_uri: redirectUri,
       }),
     });
     if (!tokenRes.ok) {
       const txt = await tokenRes.text();
       console.error("Falha ao trocar code por token:", txt);
+      // Diagnóstico seguro (não expõe o secret):
+      console.error("Diagnóstico Discord OAuth2:", {
+        status: tokenRes.status,
+        clientId,
+        clientSecretLength: clientSecret.length,
+        redirectUri,
+        dica: txt.includes("invalid_client")
+          ? "client_id/client_secret não conferem. Gere um novo Client Secret no Developer Portal (OAuth2), atualize DISCORD_CLIENT_SECRET na Vercel e faça Redeploy."
+          : txt.includes("invalid_grant")
+          ? "redirect_uri diferente do cadastrado no Discord, ou o code já foi usado/expirou."
+          : undefined,
+      });
       res.redirect(302, "/?authError=1");
       return;
     }
