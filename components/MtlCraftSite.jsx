@@ -356,6 +356,7 @@ const CATEGORY_META = {
   vip:          { label: "VIP",              icon: Crown,    anchor: "#vip" },
   personalizado:{ label: "Personalizados",   icon: Wrench,   anchor: "#personalizado" },
   tags:         { label: "Tags",             icon: TagIcon,  anchor: "#tags" },
+  cla:          { label: "Clã Oficial",      icon: Shield,   anchor: "#cla" },
   bases:        { label: "Bases",            icon: HomeIcon, anchor: "#bases" },
   coord:        { label: "Coord Express",    icon: MapPin,   anchor: "#coord" },
 };
@@ -453,6 +454,41 @@ const tagPlans = [
   { id: "tag-semanal", name: "TAG SEMANAL", price: 1.00, period: "Semanal" },
   { id: "tag-mensal",  name: "TAG MENSAL",  price: 3.50, period: "Mensal" },
 ];
+
+/* ------------------------------ CLÃ OFICIAL ------------------------------ */
+// Produto independente das Tags e dos Kits. É o ÚNICO que exige o "Nome do Clã"
+// na etapa de continuar a compra; o nome vai junto do pedido e o bot o mostra
+// no ticket do Discord. Não entra no carrinho nem no catálogo geral.
+// Estas constantes espelham lib/clan.js (o backend valida tudo de novo).
+const CLAN_PRODUCT_ID = "cla-oficial";
+const CLAN_NAME_MIN = 2;
+const CLAN_NAME_MAX = 32;
+
+// EDITAR AQUI: preço e descrição do Clã Oficial. O preço precisa ser o MESMO
+// de prisma/seed.js (o backend cobra o valor do banco, não o daqui).
+const clanPlan = {
+  id: CLAN_PRODUCT_ID,
+  name: "CLÃ OFICIAL",
+  price: 20.00,
+  category: "cla",
+  desc: "Reivindique o seu clã no MTL CRAFT. Informe o nome do clã e abriremos o atendimento no Discord para finalizar.",
+  buyable: true,
+};
+
+function normalizeClanName(raw) {
+  return String(raw || "").replace(/\s+/g, " ").trim();
+}
+
+// Retorna a mensagem de erro, ou "" se o nome está válido.
+function getClanNameError(raw) {
+  const value = normalizeClanName(raw);
+  if (!value) return "Informe o Nome do Clã para continuar.";
+  const length = Array.from(value).length;
+  if (length < CLAN_NAME_MIN) return `O Nome do Clã precisa ter pelo menos ${CLAN_NAME_MIN} caracteres.`;
+  if (length > CLAN_NAME_MAX) return `O Nome do Clã pode ter no máximo ${CLAN_NAME_MAX} caracteres.`;
+  if (/[`\p{C}]/u.test(value)) return "O Nome do Clã contém caracteres não permitidos.";
+  return "";
+}
 
 const bases = [
   { id: "base-basica", name: "BASE BÁSICA", price: 30.00, stock: 3, desc: "Base inicial pronta para uso, ideal para começar com segurança." },
@@ -654,8 +690,9 @@ const NAV_LINKS = [
   { label: "Início", href: "#inicio" },
   { label: "Kits", href: "#kits" },
   { label: "VIP", href: "#vip" },
-  { label: "Kits Personalizados", href: "#personalizado" },
   { label: "Tags", href: "#tags" },
+  { label: "Clã Oficial", href: "#cla" },
+  { label: "Kits Personalizados", href: "#personalizado" },
   { label: "Bases", href: "#bases" },
   { label: "Coord Express", href: "#coord" },
   { label: "Pagamento", href: "#pagamento" },
@@ -887,8 +924,9 @@ function CategoriesSection({ onSelect }) {
   const items = [
     { key: "kits", label: "Kits", emoji: "⚔️" },
     { key: "vip", label: "VIP", emoji: "💎" },
-    { key: "personalizado", label: "Kit Personalizado", emoji: "🛠️" },
     { key: "tags", label: "Tag Personalizada", emoji: "🏷️" },
+    { key: "cla", label: "Clã Oficial", emoji: "🏰" },
+    { key: "personalizado", label: "Kit Personalizado", emoji: "🛠️" },
     { key: "bases", label: "Bases à Venda", emoji: "🏠" },
     { key: "coord", label: "Coord Express", emoji: "📍" },
   ];
@@ -1560,6 +1598,48 @@ function TagSection({ onBuy }) {
   );
 }
 
+/* ------------------------------ CLÃ OFICIAL ------------------------------ */
+
+function ClanSection({ onBuy }) {
+  return (
+    <section id="cla" className="mc-section">
+      <Reveal>
+        <h2 className="mc-section-title">
+          <Shield size={20} className="mc-title-icon" /> Clã Oficial
+        </h2>
+        <p className="mc-section-sub">
+          Um clã oficial para o seu grupo dentro do servidor.
+        </p>
+      </Reveal>
+
+      <Reveal delay={80}>
+        <div className="mc-tag-card">
+          <p className="mc-tag-desc">{clanPlan.desc}</p>
+
+          <div className="mc-tag-includes">
+            <h4>Como funciona:</h4>
+            <ul>
+              <li><Check size={14} /> Clique em Reivindicar Clã e informe o Nome do Clã</li>
+              <li><Check size={14} /> O pedido é aberto no Discord com o nome do seu clã</li>
+              <li><Check size={14} /> Envie o comprovante no atendimento para finalizar</li>
+            </ul>
+          </div>
+
+          <div className="mc-tag-plans">
+            <div className="mc-tag-plan">
+              <span className="mc-tag-plan-period">Clã Oficial</span>
+              <span className="mc-tag-plan-price">{formatPrice(clanPlan.price)}</span>
+              <button className="mc-btn mc-btn-primary mc-btn-xs" onClick={() => onBuy(clanPlan, "buy")}>
+                Reivindicar Clã
+              </button>
+            </div>
+          </div>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
 /* ------------------------------ BASES ------------------------------------------- */
 
 function BasesSection({ onBuy }) {
@@ -1711,11 +1791,18 @@ function PaymentSection() {
 // Monta o payload que o backend precisa para criar o pedido de verdade.
 // O preço mostrado aqui é só para a interface — quem manda é o backend
 // (ver 11. NÃO CONFIAR NO PREÇO DO FRONTEND / pages/api/orders/index.js).
-function buildOrderPayload(data, qty) {
+function buildOrderPayload(data, qty, clanName) {
   const isKit = data.type === "kit";
   if (isKit) {
     return {
       items: data.items.map((i) => ({ productId: i.id, quantity: i.qty })),
+    };
+  }
+  // Clã Oficial: 1 unidade e o Nome do Clã (só esse produto envia o campo).
+  if (data.product.id === CLAN_PRODUCT_ID) {
+    return {
+      items: [{ productId: CLAN_PRODUCT_ID, quantity: 1 }],
+      clanName: normalizeClanName(clanName),
     };
   }
   return { items: [{ productId: data.product.id, quantity: qty }] };
@@ -1729,11 +1816,14 @@ function BuyModal({ data, onClose }) {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [order, setOrder] = useState(null);
+  const [clanName, setClanName] = useState("");
   const [discount, setDiscount] = useState({ couponCode: null, discountTotal: 0, finalTotal: 0 });
   const idemKeyRef = useRef(null);
 
   useEffect(() => {
     setQty(1);
+    // Se voltou do login do Discord, o nome do clã digitado antes vem em data.clanName.
+    setClanName(data?.clanName || "");
     setErrorMsg("");
     setOrder(null);
     setStep(data?.type === "kit" ? "confirm" : data?.mode === "detail" ? "detail" : "select");
@@ -1755,9 +1845,13 @@ function BuyModal({ data, onClose }) {
 
   const isKit = data.type === "kit";
   const product = data.product;
-  const subtotal = isKit ? data.total : (product?.price ?? 0) * qty;
+  const isClan = !isKit && product?.id === CLAN_PRODUCT_ID;
+  const clanError = isClan ? getClanNameError(clanName) : "";
+  const subtotal = isKit ? data.total : (product?.price ?? 0) * (isClan ? 1 : qty);
 
   const goCheckout = () => {
+    // Clã Oficial: sem Nome do Clã válido não dá para continuar.
+    if (isClan && clanError) return;
     if (!auth.user) {
       setStep("auth");
       return;
@@ -1772,7 +1866,7 @@ function BuyModal({ data, onClose }) {
 
   const handleLoginDiscord = () => {
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    auth.loginWithDiscord({ ...data, __resumeToken: token });
+    auth.loginWithDiscord({ ...data, __resumeToken: token, ...(isClan ? { clanName: normalizeClanName(clanName) } : {}) });
   };
 
   const handleLoginPasskey = async () => {
@@ -1789,6 +1883,10 @@ function BuyModal({ data, onClose }) {
   };
 
   const confirmOrder = async () => {
+    if (isClan && clanError) {
+      setStep("select");
+      return;
+    }
     setBusy(true);
     setErrorMsg("");
     if (!idemKeyRef.current) {
@@ -1796,7 +1894,7 @@ function BuyModal({ data, onClose }) {
     }
     try {
       const payload = {
-        ...buildOrderPayload(data, qty),
+        ...buildOrderPayload(data, qty, clanName),
         idempotencyKey: idemKeyRef.current,
         couponCode: discount.couponCode || undefined,
       };
@@ -1859,30 +1957,65 @@ function BuyModal({ data, onClose }) {
           <>
             <CategoryBadge category={product.category} />
             <h3 className="mc-modal-title">{product.name}</h3>
+            {isClan && <p className="mc-modal-desc">{product.desc}</p>}
 
             <div className="mc-modal-line">
-              <span>Preço unitário</span>
+              <span>{isClan ? "Preço" : "Preço unitário"}</span>
               <span>{formatPrice(product.price)}</span>
             </div>
-            <div className="mc-modal-line">
-              <span>Quantidade</span>
-              <Counter value={qty} onChange={setQty} />
-            </div>
-            <div className="mc-modal-line">
-              <span>Subtotal</span>
-              <span>{formatPrice(subtotal)}</span>
-            </div>
+            {!isClan && (
+              <div className="mc-modal-line">
+                <span>Quantidade</span>
+                <Counter value={qty} onChange={setQty} />
+              </div>
+            )}
+            {isClan && (
+              <div className="mc-clan-field">
+                <label htmlFor="mc-clan-name" className="mc-clan-label">
+                  Nome do Clã <span className="mc-clan-required">*</span>
+                </label>
+                <input
+                  id="mc-clan-name"
+                  className="mc-clan-input"
+                  type="text"
+                  value={clanName}
+                  onChange={(e) => setClanName(e.target.value)}
+                  placeholder="Ex.: Os Sobreviventes"
+                  maxLength={CLAN_NAME_MAX}
+                  autoComplete="off"
+                  aria-required="true"
+                  aria-invalid={!!clanError}
+                />
+                <p className={`mc-clan-hint ${clanName.trim() && clanError ? "mc-clan-hint-error" : ""}`}>
+                  {clanName.trim() && clanError
+                    ? clanError
+                    : `Obrigatório. Entre ${CLAN_NAME_MIN} e ${CLAN_NAME_MAX} caracteres.`}
+                </p>
+              </div>
+            )}
+            {!isClan && (
+              <div className="mc-modal-line">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+            )}
             <div className="mc-modal-line mc-modal-total">
               <span>Total</span>
               <span>{formatPrice(subtotal)}</span>
             </div>
 
-            <button className="mc-btn mc-btn-primary mc-btn-block" onClick={goCheckout}>
+            <button
+              className="mc-btn mc-btn-primary mc-btn-block"
+              onClick={goCheckout}
+              disabled={isClan && !!clanError}
+            >
               Continuar compra
             </button>
-            <button className="mc-btn mc-btn-outline mc-btn-block mc-btn-mt" onClick={handleAddToCart}>
-              <ShoppingCart size={15} /> Adicionar ao carrinho
-            </button>
+            {!isClan && (
+              <button className="mc-btn mc-btn-outline mc-btn-block mc-btn-mt" onClick={handleAddToCart}>
+                <ShoppingCart size={15} /> Adicionar ao carrinho
+              </button>
+            )}
           </>
         )}
 
@@ -1925,8 +2058,14 @@ function BuyModal({ data, onClose }) {
               </ul>
             ) : (
               <div className="mc-modal-line">
-                <span>{qty}× {product.name}</span>
+                <span>{isClan ? 1 : qty}× {product.name}</span>
                 <span>{formatPrice(subtotal)}</span>
+              </div>
+            )}
+            {isClan && (
+              <div className="mc-modal-line">
+                <span>Nome do Clã</span>
+                <span className="mc-clan-summary-name">{normalizeClanName(clanName)}</span>
               </div>
             )}
 
@@ -2308,7 +2447,9 @@ function AccountPanel({ onClose }) {
   }, []);
 
   const buyAgain = (order) => {
-    const activeItems = order.items.filter((i) => i.product?.active && i.product?.slug);
+    const activeItems = order.items.filter(
+      (i) => i.product?.active && i.product?.slug && i.product.slug !== CLAN_PRODUCT_ID
+    );
     if (activeItems.length === 0) return;
     activeItems.forEach((i) => {
       cart.addItem({ id: i.product.slug, name: i.nameSnapshot, price: Number(i.unitPrice) }, i.quantity);
@@ -2339,7 +2480,7 @@ function AccountPanel({ onClose }) {
         {orders && orders.length > 0 && (
           <ul className="mc-modal-kit-list mc-account-orders-list">
             {orders.map((o) => {
-              const canReorder = o.items?.some((i) => i.product?.active);
+              const canReorder = o.items?.some((i) => i.product?.active && i.product?.slug !== CLAN_PRODUCT_ID);
               return (
                 <li key={o.id} className="mc-account-order-item">
                   <div className="mc-account-order-row">
@@ -2460,8 +2601,9 @@ function MtlCraftApp() {
         <CatalogSection onBuy={openBuy} />
         <KitsSection onBuy={openBuy} />
         <VipSection onBuy={openBuy} />
-        <CustomKitSection openTicket={openTicket} />
         <TagSection onBuy={openBuy} />
+        <ClanSection onBuy={openBuy} />
+        <CustomKitSection openTicket={openTicket} />
         <BasesSection onBuy={openBuy} />
         <CoordSection />
         <PaymentSection />
@@ -2948,6 +3090,20 @@ const CSS = `
 .mc-tag-rules ul{ display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
 .mc-tag-rules li{ font-size:12.5px; color:var(--muted); line-height:1.6; padding-left:14px; position:relative; }
 .mc-tag-rules li::before{ content:"•"; position:absolute; left:0; color:var(--blue-400); }
+
+/* ---------- Clã Oficial (campo Nome do Clã no modal) ---------- */
+.mc-clan-field{ display:flex; flex-direction:column; gap:6px; padding:12px 0 4px; }
+.mc-clan-label{ font-size:13px; font-weight:700; color:var(--white); }
+.mc-clan-required{ color:#f87171; }
+.mc-clan-input{
+  width:100%; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px;
+  padding:11px 12px; color:var(--white); font-size:14px; font-family:var(--font-body); outline:none;
+}
+.mc-clan-input:focus{ border-color:var(--blue-500); }
+.mc-clan-input::placeholder{ color:var(--muted); }
+.mc-clan-hint{ font-size:12px; color:var(--muted); margin:0; }
+.mc-clan-hint-error{ color:#FCA5A5; }
+.mc-clan-summary-name{ font-weight:700; color:var(--white); text-align:right; word-break:break-word; }
 
 /* ---------- Bases info ---------- */
 .mc-info-cols{ display:grid; gap:24px; grid-template-columns:1fr; margin-top:40px; }
