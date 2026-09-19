@@ -86,6 +86,8 @@ model Order {
   couponCode     String?
   discountAmount Decimal        @default(0) @db.Decimal(10, 2)
   total          Decimal        @db.Decimal(10, 2)
+  /// Nome do Clã — só preenchido na compra do produto "Clã Oficial".
+  clanName       String?
   status         OrderStatus    @default(PENDING_PAYMENT)
   approvedBy     String?
   approvedAt     DateTime?
