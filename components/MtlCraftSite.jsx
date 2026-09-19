@@ -464,16 +464,26 @@ const CLAN_PRODUCT_ID = "cla-oficial";
 const CLAN_NAME_MIN = 2;
 const CLAN_NAME_MAX = 32;
 
-// EDITAR AQUI: preço e descrição do Clã Oficial. O preço precisa ser o MESMO
-// de prisma/seed.js (o backend cobra o valor do banco, não o daqui).
+// EDITAR AQUI: preço do Clã Oficial. Precisa ser o MESMO de prisma/seed.js
+// (o backend cobra o valor do banco, não o daqui).
+const CLAN_EXTRA_TAG_PRICE = 0.50; // só informativo: preço de cada tag extra
 const clanPlan = {
   id: CLAN_PRODUCT_ID,
   name: "CLÃ OFICIAL",
-  price: 20.00,
+  price: 0.50,
   category: "cla",
-  desc: "Reivindique o seu clã no MTL CRAFT. Informe o nome do clã e abriremos o atendimento no Discord para finalizar.",
+  desc: `Após a confirmação do pagamento, o seu clã terá direito a 4 tags para até 4 membros. Cada nova tag adicionada custa ${formatPrice(CLAN_EXTRA_TAG_PRICE)}.`,
   buyable: true,
 };
+
+const clanBenefits = [
+  "Tag personalizada do seu clã.",
+  "Cargo exclusivo no servidor.",
+  "Maior reconhecimento dentro da comunidade.",
+  "Participação nas guerras de clãs.",
+  "Possibilidade de aparecer nos vídeos oficiais do servidor.",
+  "Participação em eventos exclusivos para clãs oficiais.",
+];
 
 function normalizeClanName(raw) {
   return String(raw || "").replace(/\s+/g, " ").trim();
@@ -1608,20 +1618,30 @@ function ClanSection({ onBuy }) {
           <Shield size={20} className="mc-title-icon" /> Clã Oficial
         </h2>
         <p className="mc-section-sub">
-          Um clã oficial para o seu grupo dentro do servidor.
+          Registre o seu clã oficial no servidor.
         </p>
       </Reveal>
 
       <Reveal delay={80}>
         <div className="mc-tag-card">
-          <p className="mc-tag-desc">{clanPlan.desc}</p>
+          <div className="mc-clan-info">
+            <p className="mc-tag-desc">
+              Para registrar um clã oficial, é necessário efetuar o pagamento de {formatPrice(clanPlan.price)}.
+            </p>
+            <p className="mc-tag-desc">
+              Após a confirmação do pagamento, o seu clã terá direito a 4 tags para até 4 membros.
+            </p>
+            <p className="mc-tag-desc">
+              Caso deseje adicionar mais membros, será cobrado {formatPrice(CLAN_EXTRA_TAG_PRICE)} por cada nova tag adicionada.
+            </p>
+          </div>
 
           <div className="mc-tag-includes">
-            <h4>Como funciona:</h4>
+            <h4>Benefícios</h4>
             <ul>
-              <li><Check size={14} /> Clique em Reivindicar Clã e informe o Nome do Clã</li>
-              <li><Check size={14} /> O pedido é aberto no Discord com o nome do seu clã</li>
-              <li><Check size={14} /> Envie o comprovante no atendimento para finalizar</li>
+              {clanBenefits.map((b) => (
+                <li key={b}><Check size={14} /> {b}</li>
+              ))}
             </ul>
           </div>
 
@@ -3092,6 +3112,8 @@ const CSS = `
 .mc-tag-rules li::before{ content:"•"; position:absolute; left:0; color:var(--blue-400); }
 
 /* ---------- Clã Oficial (campo Nome do Clã no modal) ---------- */
+.mc-clan-info{ margin-bottom:10px; }
+.mc-clan-info .mc-tag-desc{ margin:0 0 12px; }
 .mc-clan-field{ display:flex; flex-direction:column; gap:6px; padding:12px 0 4px; }
 .mc-clan-label{ font-size:13px; font-weight:700; color:var(--white); }
 .mc-clan-required{ color:#f87171; }
