@@ -1,6 +1,7 @@
 const { prisma } = require("../../../lib/prisma");
 const { getSessionFromReq } = require("../../../lib/session");
 const { generateUniqueOrderCode } = require("../../../lib/orderCode");
+const { CLAN_PRODUCT_SLUG, validateClanName } = require("../../../lib/clan");
 
 export default async function handler(req, res) {
   const session = await getSessionFromReq(req);
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
 }
 
 async function createOrder(req, res, session) {
-  const { items, idempotencyKey, couponCode } = req.body || {};
+  const { items, idempotencyKey, couponCode, clanName } = req.body || {};
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Carrinho vazio." });
@@ -39,6 +40,19 @@ async function createOrder(req, res, session) {
     if (!it || typeof it.productId !== "string" || !Number.isInteger(it.quantity) || it.quantity < 1 || it.quantity > 99) {
       return res.status(400).json({ error: "Item de pedido inválido." });
     }
+  }
+
+  // ---- Clã Oficial ----
+  // Produto independente: é comprado sozinho (1 unidade) e é o único que exige
+  // o Nome do Clã. Nas demais compras o campo é ignorado (fica nulo).
+  let validClanName = null;
+  if (items.some((it) => it.productId === CLAN_PRODUCT_SLUG)) {
+    if (items.length !== 1 || items[0].quantity !== 1) {
+      return res.status(400).json({ error: "O Clã Oficial deve ser comprado sozinho, 1 unidade por pedido." });
+    }
+    const checked = validateClanName(clanName);
+    if (!checked.ok) return res.status(400).json({ error: checked.error });
+    validClanName = checked.value;
   }
 
   // Reaproveita o pedido já criado se o mesmo clique tiver sido reenviado
@@ -146,6 +160,7 @@ async function createOrder(req, res, session) {
           couponCode: coupon ? coupon.code : null,
           discountAmount,
           total,
+          clanName: validClanName,
           items: { create: orderItemsData },
         },
         include: { items: true, user: true },
