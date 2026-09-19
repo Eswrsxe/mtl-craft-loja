@@ -60,9 +60,9 @@ const PRODUCTS = [
   ["base-basica", "BASE BÁSICA", 30.00, "bases"],
   ["base-op", "BASE OP", 50.00, "bases"],
   // Clã Oficial (Reivindicar Clã) — exige o Nome do Clã na compra (ver lib/clan.js).
-  // EDITAR AQUI: preço do Clã Oficial. Precisa ser o MESMO valor de clanPlan.price
+  // Preço do Clã Oficial. Precisa ser o MESMO valor de clanPlan.price
   // em components/MtlCraftSite.jsx (o backend cobra o valor daqui/do banco).
-  ["cla-oficial", "CLÃ OFICIAL", 20.00, "cla"],
+  ["cla-oficial", "CLÃ OFICIAL", 0.50, "cla"],
   // Itens do Kit Personalizado
   ["ci-full", "Qualquer item full", 0.75, "personalizado"],
   ["ci-macadour", "Pack de Maçã Dourada", 0.50, "personalizado"],
