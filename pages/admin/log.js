@@ -49,6 +49,7 @@ export default function AdminLog() {
           <h1 className="ac-title">📋 Log de ações — MTL CRAFT</h1>
           <a className="ac-link" href="/admin/dashboard">Dashboard</a>
           <a className="ac-link" href="/admin/cupons">Cupons</a>
+          <a className="ac-link" href="/admin/pedido">Novo pedido</a>
         </div>
 
         {status === "loading" && <p className="ac-muted">Carregando...</p>}
