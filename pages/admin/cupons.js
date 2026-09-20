@@ -94,6 +94,7 @@ export default function AdminCoupons() {
           <h1 className="ac-title">🏷️ Cupons — MTL CRAFT</h1>
           <a className="ac-link" href="/admin/dashboard">Dashboard</a>
           <a className="ac-link" href="/admin/log">Log de ações</a>
+          <a className="ac-link" href="/admin/pedido">Novo pedido</a>
         </div>
 
         {status === "loading" && <p className="ac-muted">Carregando...</p>}
