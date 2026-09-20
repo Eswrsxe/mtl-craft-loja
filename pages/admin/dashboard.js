@@ -43,6 +43,7 @@ export default function AdminDashboard() {
           <h1 className="ac-title">📊 Dashboard — MTL CRAFT</h1>
           <a className="ac-link" href="/admin/cupons">Cupons</a>
           <a className="ac-link" href="/admin/log">Log de ações</a>
+          <a className="ac-link" href="/admin/pedido">Novo pedido</a>
         </div>
 
         {status === "loading" && <p className="ac-muted">Carregando...</p>}
