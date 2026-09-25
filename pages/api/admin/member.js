@@ -8,7 +8,7 @@ const { isValidDiscordId, resolveTargetMember } = require("../../../lib/discordM
 export default async function handler(req, res) {
   const session = await getSessionFromReq(req);
   if (!session) return res.status(401).json({ error: "Faça login para continuar." });
-  if (!isAdminSession(session)) return res.status(403).json({ error: "Acesso restrito à equipe." });
+  if (!(await isAdminSession(session))) return res.status(403).json({ error: "Acesso restrito à equipe." });
 
   if (req.method !== "GET") return res.status(405).json({ error: "Método não permitido" });
 
