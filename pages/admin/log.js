@@ -48,7 +48,7 @@ export default function AdminLog() {
   }, []);
 
   const loadInvite = useCallback(() => {
-    apiFetch("/api/invites/me")
+    apiFetch("/api/admin/invites/me")
       .then((res) => setMyInvite(res.invite))
       .catch(() => {});
   }, []);
@@ -62,7 +62,7 @@ export default function AdminLog() {
     setInviteBusy(true);
     setInviteMsg("");
     try {
-      const res = await apiFetch("/api/invites/respond", { method: "POST", body: JSON.stringify({ action }) });
+      const res = await apiFetch("/api/admin/invites/respond", { method: "POST", body: JSON.stringify({ action }) });
       setMyInvite(res.invite);
       if (action === "accept") {
         setInviteMsg("Convite aceito! Você agora tem acesso de admin no site.");
