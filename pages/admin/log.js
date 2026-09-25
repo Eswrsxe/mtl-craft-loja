@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 
-async function apiFetch(url) {
-  const res = await fetch(url, { credentials: "include" });
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
   let body = null;
   try {
     body = await res.json();
@@ -24,6 +28,12 @@ export default function AdminLog() {
   const [status, setStatus] = useState("loading");
   const [events, setEvents] = useState(null);
 
+  // Convite de admin pra QUEM ESTIVER LOGADO (mesmo sem ser admin ainda) —
+  // por isso é buscado à parte da checagem de acesso ao log em si.
+  const [myInvite, setMyInvite] = useState(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState("");
+
   const load = useCallback(() => {
     apiFetch("/api/admin/log")
       .then((res) => {
@@ -37,9 +47,37 @@ export default function AdminLog() {
       });
   }, []);
 
+  const loadInvite = useCallback(() => {
+    apiFetch("/api/invites/me")
+      .then((res) => setMyInvite(res.invite))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadInvite();
+  }, [load, loadInvite]);
+
+  const respond = async (action) => {
+    setInviteBusy(true);
+    setInviteMsg("");
+    try {
+      const res = await apiFetch("/api/invites/respond", { method: "POST", body: JSON.stringify({ action }) });
+      setMyInvite(res.invite);
+      if (action === "accept") {
+        setInviteMsg("Convite aceito! Você agora tem acesso de admin no site.");
+        load(); // reconfere o log — agora deve carregar normalmente
+      } else {
+        setInviteMsg("Convite recusado.");
+      }
+    } catch (e) {
+      setInviteMsg(e.message);
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const showInviteCard = myInvite?.status === "PENDING";
 
   return (
     <div className="ac-root">
@@ -50,6 +88,7 @@ export default function AdminLog() {
           <a className="ac-link" href="/admin/dashboard">Dashboard</a>
           <a className="ac-link" href="/admin/cupons">Cupons</a>
           <a className="ac-link" href="/admin/pedido">Novo pedido</a>
+          <a className="ac-link" href="/admin/convite">Convites</a>
         </div>
 
         {status === "loading" && <p className="ac-muted">Carregando...</p>}
@@ -59,7 +98,35 @@ export default function AdminLog() {
             <a className="ac-btn ac-btn-primary" href="/api/auth/discord/login">Entrar com Discord</a>
           </div>
         )}
-        {status === "denied" && <div className="ac-card"><p>🔒 Acesso restrito à equipe.</p></div>}
+
+        {status === "denied" && (
+          <>
+            {showInviteCard ? (
+              <div className="ac-card ac-invite-card">
+                <p>🎉 Você foi convidado a virar admin do site!</p>
+                <p className="ac-muted ac-small">
+                  Aceitando, você ganha acesso ao painel de admin do site (cupons, pedidos, log e dashboard) —
+                  mesmo sem ser DM no servidor. Isso não muda nada dentro do Discord, só no site.
+                </p>
+                <div className="ac-invite-actions">
+                  <button className="ac-btn ac-btn-primary" disabled={inviteBusy} onClick={() => respond("accept")}>
+                    {inviteBusy ? "Aguarde..." : "Aceitar"}
+                  </button>
+                  <button className="ac-btn ac-btn-outline" disabled={inviteBusy} onClick={() => respond("decline")}>
+                    Recusar
+                  </button>
+                </div>
+                {inviteMsg && <p className="ac-small" style={{ marginTop: 10 }}>{inviteMsg}</p>}
+              </div>
+            ) : (
+              <div className="ac-card">
+                <p>🔒 Acesso restrito à equipe.</p>
+                {inviteMsg && <p className="ac-small" style={{ marginTop: 10 }}>{inviteMsg}</p>}
+              </div>
+            )}
+          </>
+        )}
+
         {status === "error" && <div className="ac-card"><p>Não foi possível carregar o log. Tenta recarregar.</p></div>}
 
         {status === "ready" && (
@@ -99,9 +166,14 @@ const CSS = `
 .ac-link{ color:#60A5FA; font-size:13px; font-weight:700; text-decoration:none; }
 .ac-link:hover{ text-decoration:underline; }
 .ac-muted{ color:#8DA0BE; }
+.ac-small{ font-size:11px; color:#8DA0BE; }
 .ac-card{ background:#101722; border:1px solid rgba(96,165,250,0.14); border-radius:16px; padding:22px; }
+.ac-invite-card{ border-color:rgba(74,222,128,0.35); }
+.ac-invite-actions{ display:flex; gap:12px; margin-top:14px; }
 .ac-btn{ display:inline-flex; align-items:center; gap:6px; border-radius:10px; border:1px solid transparent; font-weight:700; font-size:13.5px; padding:10px 18px; cursor:pointer; text-decoration:none; }
+.ac-btn:disabled{ opacity:0.5; cursor:not-allowed; }
 .ac-btn-primary{ background:linear-gradient(135deg,#3B82F6,#1D4ED8); color:#fff; }
+.ac-btn-outline{ background:transparent; color:#60A5FA; border-color:rgba(96,165,250,0.4); }
 .ac-log-list{ display:flex; flex-direction:column; gap:10px; margin:0; padding:0; list-style:none; }
 .ac-log-item{ display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,0.03); border-radius:10px; padding:12px 14px; }
 .ac-log-body{ display:flex; flex-direction:column; gap:2px; }
