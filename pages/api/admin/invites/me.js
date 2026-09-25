@@ -1,5 +1,6 @@
 const { prisma } = require("../../../../lib/prisma");
 const { getSessionFromReq } = require("../../../../lib/session");
+const { describeDbError } = require("../../../../lib/dbError");
 
 // /api/admin/invites/me — QUALQUER pessoa logada (não precisa ser admin
 // ainda) consulta se ela tem um convite de admin pendente/já respondido. É
@@ -12,6 +13,11 @@ export default async function handler(req, res) {
 
   if (req.method !== "GET") return res.status(405).json({ error: "Método não permitido" });
 
-  const invite = await prisma.adminGrant.findUnique({ where: { discordId: session.discordId } });
-  return res.status(200).json({ invite: invite || null });
+  try {
+    const invite = await prisma.adminGrant.findUnique({ where: { discordId: session.discordId } });
+    return res.status(200).json({ invite: invite || null });
+  } catch (e) {
+    console.error("Erro em /api/admin/invites/me:", e);
+    return res.status(500).json({ error: describeDbError(e, "20260925160000_admin_grants") });
+  }
 }
