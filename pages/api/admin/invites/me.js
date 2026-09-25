@@ -1,9 +1,11 @@
-const { prisma } = require("../../../lib/prisma");
-const { getSessionFromReq } = require("../../../lib/session");
+const { prisma } = require("../../../../lib/prisma");
+const { getSessionFromReq } = require("../../../../lib/session");
 
-// /api/invites/me — QUALQUER pessoa logada (não precisa ser admin ainda)
-// consulta se ela tem um convite de admin pendente/já respondido. É o que
-// alimenta o aviso "você foi convidado" em /admin/log.
+// /api/admin/invites/me — QUALQUER pessoa logada (não precisa ser admin
+// ainda) consulta se ela tem um convite de admin pendente/já respondido. É
+// o que alimenta o aviso "você foi convidado" em /admin/log. Apesar do
+// caminho começar com /admin/, essa rota NÃO exige ser admin — de propósito,
+// pra quem ainda não é admin conseguir ver e responder o próprio convite.
 export default async function handler(req, res) {
   const session = await getSessionFromReq(req);
   if (!session) return res.status(401).json({ error: "Faça login para continuar." });
