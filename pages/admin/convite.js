@@ -38,6 +38,7 @@ const STATUS_META = {
 export default function AdminConvite() {
   const [status, setStatus] = useState("loading"); // loading | denied | needsLogin | error | ready
   const [invites, setInvites] = useState([]);
+  const [loadError, setLoadError] = useState("");
 
   const [idInput, setIdInput] = useState("");
   const [lookup, setLookup] = useState(null); // { user, isFixedAdmin, grantStatus }
@@ -57,7 +58,10 @@ export default function AdminConvite() {
       .catch((e) => {
         if (e.status === 401) setStatus("needsLogin");
         else if (e.status === 403) setStatus("denied");
-        else setStatus("error");
+        else {
+          setLoadError(e.message || `Erro (${e.status})`);
+          setStatus("error");
+        }
       });
   }, []);
 
@@ -145,7 +149,12 @@ export default function AdminConvite() {
           </div>
         )}
         {status === "denied" && <div className="ac-card"><p>🔒 Acesso restrito à equipe.</p></div>}
-        {status === "error" && <div className="ac-card"><p>Não foi possível carregar os convites. Tenta recarregar.</p></div>}
+        {status === "error" && (
+          <div className="ac-card">
+            <p>Não foi possível carregar os convites.</p>
+            {loadError && <p className="ac-error" style={{ marginTop: 8 }}>{loadError}</p>}
+          </div>
+        )}
 
         {status === "ready" && (
           <>
