@@ -44,6 +44,7 @@ export default function AdminDashboard() {
           <a className="ac-link" href="/admin/cupons">Cupons</a>
           <a className="ac-link" href="/admin/log">Log de ações</a>
           <a className="ac-link" href="/admin/pedido">Novo pedido</a>
+          <a className="ac-link" href="/admin/convite">Convites</a>
         </div>
 
         {status === "loading" && <p className="ac-muted">Carregando...</p>}
