@@ -1,9 +1,10 @@
-const { prisma } = require("../../../lib/prisma");
-const { getSessionFromReq } = require("../../../lib/session");
+const { prisma } = require("../../../../lib/prisma");
+const { getSessionFromReq } = require("../../../../lib/session");
 
-// /api/invites/respond — QUALQUER pessoa logada aceita ou recusa o PRÓPRIO
-// convite de admin. Aceitar dá acesso ao painel /admin do site (nunca mexe
-// em cargo/permissão dentro do servidor do Discord).
+// /api/admin/invites/respond — QUALQUER pessoa logada aceita ou recusa o
+// PRÓPRIO convite de admin (sem precisar já ser admin — ver nota em me.js).
+// Aceitar dá acesso ao painel /admin do site (nunca mexe em cargo/permissão
+// dentro do servidor do Discord).
 export default async function handler(req, res) {
   const session = await getSessionFromReq(req);
   if (!session) return res.status(401).json({ error: "Faça login para continuar." });
