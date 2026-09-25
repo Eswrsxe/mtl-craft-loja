@@ -1,5 +1,6 @@
 const { prisma } = require("../../../../lib/prisma");
 const { getSessionFromReq } = require("../../../../lib/session");
+const { describeDbError } = require("../../../../lib/dbError");
 
 // /api/admin/invites/respond — QUALQUER pessoa logada aceita ou recusa o
 // PRÓPRIO convite de admin (sem precisar já ser admin — ver nota em me.js).
@@ -16,16 +17,21 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Ação inválida (use accept ou decline)." });
   }
 
-  const invite = await prisma.adminGrant.findUnique({ where: { discordId: session.discordId } });
-  if (!invite) return res.status(404).json({ error: "Você não tem nenhum convite." });
-  if (invite.status !== "PENDING") {
-    return res.status(409).json({ error: "Esse convite já foi respondido." });
+  try {
+    const invite = await prisma.adminGrant.findUnique({ where: { discordId: session.discordId } });
+    if (!invite) return res.status(404).json({ error: "Você não tem nenhum convite." });
+    if (invite.status !== "PENDING") {
+      return res.status(409).json({ error: "Esse convite já foi respondido." });
+    }
+
+    const updated = await prisma.adminGrant.update({
+      where: { discordId: session.discordId },
+      data: { status: action === "accept" ? "ACCEPTED" : "DECLINED", respondedAt: new Date() },
+    });
+
+    return res.status(200).json({ invite: updated });
+  } catch (e) {
+    console.error("Erro em /api/admin/invites/respond:", e);
+    return res.status(500).json({ error: describeDbError(e, "20260925160000_admin_grants") });
   }
-
-  const updated = await prisma.adminGrant.update({
-    where: { discordId: session.discordId },
-    data: { status: action === "accept" ? "ACCEPTED" : "DECLINED", respondedAt: new Date() },
-  });
-
-  return res.status(200).json({ invite: updated });
 }
