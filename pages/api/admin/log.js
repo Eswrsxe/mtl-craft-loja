@@ -1,186 +1,49 @@
-import { useState, useEffect, useCallback } from "react";
+const { prisma } = require("../../../lib/prisma");
+const { getSessionFromReq } = require("../../../lib/session");
+const { isAdminSession } = require("../../../lib/adminAuth");
 
-async function apiFetch(url, options = {}) {
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
+export default async function handler(req, res) {
+  const session = await getSessionFromReq(req);
+  if (!session) return res.status(401).json({ error: "Faça login para continuar." });
+  if (!(await isAdminSession(session))) return res.status(403).json({ error: "Acesso restrito à equipe." });
+
+  if (req.method !== "GET") return res.status(405).json({ error: "Método não permitido" });
+
+  const orders = await prisma.order.findMany({
+    where: {
+      OR: [{ approvedBy: { not: null } }, { rejectedBy: { not: null } }, { deliveredBy: { not: null } }],
+    },
+    select: {
+      code: true,
+      total: true,
+      status: true,
+      approvedBy: true,
+      approvedAt: true,
+      rejectedBy: true,
+      rejectedAt: true,
+      deliveredBy: true,
+      deliveredAt: true,
+      user: { select: { username: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 200,
   });
-  let body = null;
-  try {
-    body = await res.json();
-  } catch (_) {}
-  if (!res.ok) throw { status: res.status, message: body?.error || `Erro (${res.status})` };
-  return body;
-}
 
-function formatPrice(n) {
-  return `R$ ${Number(n || 0).toFixed(2).replace(".", ",")}`;
-}
-
-const TYPE_META = {
-  APROVOU: { emoji: "✅", label: "Aprovou pagamento", cls: "ac-badge-on" },
-  RECUSOU: { emoji: "❌", label: "Recusou pagamento", cls: "ac-badge-off-red" },
-  ENTREGOU: { emoji: "📦", label: "Marcou como entregue", cls: "ac-badge-blue" },
-};
-
-export default function AdminLog() {
-  const [status, setStatus] = useState("loading");
-  const [events, setEvents] = useState(null);
-
-  // Convite de admin pra QUEM ESTIVER LOGADO (mesmo sem ser admin ainda) —
-  // por isso é buscado à parte da checagem de acesso ao log em si.
-  const [myInvite, setMyInvite] = useState(null);
-  const [inviteBusy, setInviteBusy] = useState(false);
-  const [inviteMsg, setInviteMsg] = useState("");
-
-  const load = useCallback(() => {
-    apiFetch("/api/admin/log")
-      .then((res) => {
-        setEvents(res.events);
-        setStatus("ready");
-      })
-      .catch((e) => {
-        if (e.status === 401) setStatus("needsLogin");
-        else if (e.status === 403) setStatus("denied");
-        else setStatus("error");
-      });
-  }, []);
-
-  const loadInvite = useCallback(() => {
-    apiFetch("/api/admin/invites/me")
-      .then((res) => setMyInvite(res.invite))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    load();
-    loadInvite();
-  }, [load, loadInvite]);
-
-  const respond = async (action) => {
-    setInviteBusy(true);
-    setInviteMsg("");
-    try {
-      const res = await apiFetch("/api/admin/invites/respond", { method: "POST", body: JSON.stringify({ action }) });
-      setMyInvite(res.invite);
-      if (action === "accept") {
-        setInviteMsg("Convite aceito! Você agora tem acesso de admin no site.");
-        load(); // reconfere o log — agora deve carregar normalmente
-      } else {
-        setInviteMsg("Convite recusado.");
-      }
-    } catch (e) {
-      setInviteMsg(e.message);
-    } finally {
-      setInviteBusy(false);
+  // Achata em uma lista de "eventos" (1 pedido pode ter até 3: aprovou,
+  // recusou, entregou) já ordenada do mais recente pro mais antigo.
+  const events = [];
+  for (const o of orders) {
+    if (o.approvedBy) {
+      events.push({ type: "APROVOU", staff: o.approvedBy, at: o.approvedAt, orderCode: o.code, buyer: o.user.username, total: o.total });
     }
-  };
+    if (o.rejectedBy) {
+      events.push({ type: "RECUSOU", staff: o.rejectedBy, at: o.rejectedAt, orderCode: o.code, buyer: o.user.username, total: o.total });
+    }
+    if (o.deliveredBy) {
+      events.push({ type: "ENTREGOU", staff: o.deliveredBy, at: o.deliveredAt, orderCode: o.code, buyer: o.user.username, total: o.total });
+    }
+  }
+  events.sort((a, b) => new Date(b.at) - new Date(a.at));
 
-  const showInviteCard = myInvite?.status === "PENDING";
-
-  return (
-    <div className="ac-root">
-      <style>{CSS}</style>
-      <div className="ac-wrap">
-        <div className="ac-topbar">
-          <h1 className="ac-title">📋 Log de ações — MTL CRAFT</h1>
-          <a className="ac-link" href="/admin/dashboard">Dashboard</a>
-          <a className="ac-link" href="/admin/cupons">Cupons</a>
-          <a className="ac-link" href="/admin/pedido">Novo pedido</a>
-          <a className="ac-link" href="/admin/convite">Convites</a>
-        </div>
-
-        {status === "loading" && <p className="ac-muted">Carregando...</p>}
-        {status === "needsLogin" && (
-          <div className="ac-card">
-            <p>Você precisa entrar com sua conta do Discord pra acessar essa página.</p>
-            <a className="ac-btn ac-btn-primary" href="/api/auth/discord/login">Entrar com Discord</a>
-          </div>
-        )}
-
-        {status === "denied" && (
-          <>
-            {showInviteCard ? (
-              <div className="ac-card ac-invite-card">
-                <p>🎉 Você foi convidado a virar admin do site!</p>
-                <p className="ac-muted ac-small">
-                  Aceitando, você ganha acesso ao painel de admin do site (cupons, pedidos, log e dashboard) —
-                  mesmo sem ser DM no servidor. Isso não muda nada dentro do Discord, só no site.
-                </p>
-                <div className="ac-invite-actions">
-                  <button className="ac-btn ac-btn-primary" disabled={inviteBusy} onClick={() => respond("accept")}>
-                    {inviteBusy ? "Aguarde..." : "Aceitar"}
-                  </button>
-                  <button className="ac-btn ac-btn-outline" disabled={inviteBusy} onClick={() => respond("decline")}>
-                    Recusar
-                  </button>
-                </div>
-                {inviteMsg && <p className="ac-small" style={{ marginTop: 10 }}>{inviteMsg}</p>}
-              </div>
-            ) : (
-              <div className="ac-card">
-                <p>🔒 Acesso restrito à equipe.</p>
-                {inviteMsg && <p className="ac-small" style={{ marginTop: 10 }}>{inviteMsg}</p>}
-              </div>
-            )}
-          </>
-        )}
-
-        {status === "error" && <div className="ac-card"><p>Não foi possível carregar o log. Tenta recarregar.</p></div>}
-
-        {status === "ready" && (
-          <div className="ac-card">
-            {events.length === 0 ? (
-              <p className="ac-muted">Nenhuma ação registrada ainda.</p>
-            ) : (
-              <ul className="ac-log-list">
-                {events.map((ev, i) => {
-                  const meta = TYPE_META[ev.type];
-                  return (
-                    <li key={i} className="ac-log-item">
-                      <span className={`ac-badge ${meta.cls}`}>{meta.emoji} {meta.label}</span>
-                      <div className="ac-log-body">
-                        <span className="ac-log-main">
-                          <strong>{ev.staff}</strong> — pedido #{ev.orderCode} de @{ev.buyer} ({formatPrice(ev.total)})
-                        </span>
-                        <span className="ac-log-date">{new Date(ev.at).toLocaleString("pt-BR")}</span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return res.status(200).json({ events: events.slice(0, 150) });
 }
-
-const CSS = `
-.ac-root{ min-height:100vh; background:#05070A; color:#fff; font-family:'Inter', system-ui, sans-serif; padding:32px 16px; }
-.ac-wrap{ max-width:900px; margin:0 auto; }
-.ac-topbar{ display:flex; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px; }
-.ac-title{ font-size:24px; font-weight:800; margin:0; }
-.ac-link{ color:#60A5FA; font-size:13px; font-weight:700; text-decoration:none; }
-.ac-link:hover{ text-decoration:underline; }
-.ac-muted{ color:#8DA0BE; }
-.ac-small{ font-size:11px; color:#8DA0BE; }
-.ac-card{ background:#101722; border:1px solid rgba(96,165,250,0.14); border-radius:16px; padding:22px; }
-.ac-invite-card{ border-color:rgba(74,222,128,0.35); }
-.ac-invite-actions{ display:flex; gap:12px; margin-top:14px; }
-.ac-btn{ display:inline-flex; align-items:center; gap:6px; border-radius:10px; border:1px solid transparent; font-weight:700; font-size:13.5px; padding:10px 18px; cursor:pointer; text-decoration:none; }
-.ac-btn:disabled{ opacity:0.5; cursor:not-allowed; }
-.ac-btn-primary{ background:linear-gradient(135deg,#3B82F6,#1D4ED8); color:#fff; }
-.ac-btn-outline{ background:transparent; color:#60A5FA; border-color:rgba(96,165,250,0.4); }
-.ac-log-list{ display:flex; flex-direction:column; gap:10px; margin:0; padding:0; list-style:none; }
-.ac-log-item{ display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,0.03); border-radius:10px; padding:12px 14px; }
-.ac-log-body{ display:flex; flex-direction:column; gap:2px; }
-.ac-log-main{ font-size:13px; }
-.ac-log-date{ font-size:11px; color:#8DA0BE; }
-.ac-badge{ align-self:flex-start; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; }
-.ac-badge-on{ background:rgba(74,222,128,0.12); color:#4ADE80; border:1px solid rgba(74,222,128,0.3); }
-.ac-badge-off-red{ background:rgba(248,113,113,0.12); color:#f87171; border:1px solid rgba(248,113,113,0.3); }
-.ac-badge-blue{ background:rgba(96,165,250,0.12); color:#60A5FA; border:1px solid rgba(96,165,250,0.3); }
-`;
