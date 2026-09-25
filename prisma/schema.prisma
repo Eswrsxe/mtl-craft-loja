@@ -170,6 +170,23 @@ model Coupon {
   createdAt     DateTime  @default(now())
 }
 
+/// Convite de acesso ao painel /admin para alguém que NÃO está na lista fixa
+/// ADMIN_DISCORD_IDS. Um admin já existente escolhe o ID do Discord de
+/// qualquer pessoa que já tenha uma conta no site (tabela User) e convida —
+/// a pessoa só ganha acesso depois de ACEITAR o convite logada no site.
+/// Isso NUNCA dá cargo/permissão no servidor do Discord, só no painel do site.
+model AdminGrant {
+  id          String    @id @default(cuid())
+  discordId   String    @unique
+  status      String    @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  invitedBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  respondedAt DateTime?
+
+  @@index([status])
+}
+
 enum WebAuthnChallengeType {
   REGISTRATION
   AUTHENTICATION
